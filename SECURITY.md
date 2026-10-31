@@ -47,3 +47,13 @@ security fixes.
   commit them, bake them into Docker images, or print them in CI logs. Provide
   them through local environment variables or GitHub Actions secrets.
 - Access to data is enforced by Firestore Security Rules, not by the UI.
+
+## Repository protections
+
+- `main` is protected by the `protect-main` ruleset: no deletion, no force
+  pushes, and changes only through pull requests with one approval (the
+  maintainer may bypass on a pull request).
+- Secret scanning with push protection, Dependabot alerts and security
+  updates, CodeQL default setup and private vulnerability reporting are on.
+- The GitHub Actions token is read-only by default, and workflows from outside
+  contributors need approval before they run.
