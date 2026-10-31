@@ -1,0 +1,56 @@
+# Contributing to Generations
+
+Thank you for your interest in contributing. This guide explains how to propose
+changes.
+
+## Ground rules
+
+- Be respectful. All participation follows our [Code of Conduct](CODE_OF_CONDUCT.md).
+- Discuss larger changes in an issue before writing code.
+- Never commit secrets, service-account keys, `.env` files or personal data.
+- Report security issues privately, as described in [SECURITY.md](SECURITY.md).
+
+## Branching model
+
+- `main` is the stable branch. It only contains reviewed, approved releases.
+- Work happens on feature branches created from the appropriate base branch
+  (for the initial release, `v0.0.1`).
+- Name branches after the change, for example `feature/user-invites` or
+  `fix/login-error-message`.
+- Changes reach `main` only through a reviewed pull request.
+
+## Development workflow
+
+1. Fork the repository (external contributors) or create a branch.
+2. Install dependencies: `npm ci`.
+3. Make your change. Keep it focused on one logical task.
+4. Run the checks locally:
+
+   ```bash
+   npm run lint
+   npm run test:unit
+   npm run build
+   ```
+
+5. Update documentation (`README.md`, `docs/`) when behavior, configuration or
+   architecture changes.
+6. Open a pull request with a clear description of what changed and why.
+
+## Coding guidelines
+
+- Use Ionic components wherever possible and keep custom styling minimal.
+- Avoid new dependencies. If one is truly needed, explain why in the pull request.
+- Use the modular Firebase JS SDK directly.
+- Authorization must be enforced by Firestore Security Rules, never only in the UI.
+- Stay within the Firebase Spark (free) plan unless a maintainer agrees otherwise.
+- Formatting is handled by Prettier and linting by ESLint (`npm run lint:fix`).
+
+## Commit messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/), for example
+`feat: add registration page` or `fix: handle expired reset link`.
+
+## License
+
+By contributing, you agree that your contributions are licensed under the
+[MIT License](LICENSE).
