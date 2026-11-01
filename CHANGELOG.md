@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/deepakdaneva/generations/compare/v0.4.0...v0.5.0) (2026-11-01)
+
+
+### Features
+
+* link an existing parent, sibling or child; no new spouse after death ([#14](https://github.com/deepakdaneva/generations/issues/14)) ([498644d](https://github.com/deepakdaneva/generations/commit/498644dd0794076a1281dec44202b2c3e3ad3359))
+
 ## [0.4.0](https://github.com/deepakdaneva/generations/compare/v0.3.0...v0.4.0) (2026-11-01)
 
 
