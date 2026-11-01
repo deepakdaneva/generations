@@ -1,14 +1,56 @@
-<ion-content>
+<ion-content [scrollX]="false" [scrollY]="false">
   <app-top-actions></app-top-actions>
 
-  <!-- Placeholder for the family-tree canvas (planned for a later iteration). -->
-  <section class="tree-canvas" aria-label="Family tree canvas">
-    <div class="tree-placeholder">
-      <ion-icon name="git-network-outline" color="medium" aria-hidden="true"></ion-icon>
-      <h2>Welcome, {{ auth.profile()?.displayName }}</h2>
-      <ion-text color="medium">
-        <p>Your family tree will appear here.</p>
-      </ion-text>
+  <section
+    #canvas
+    class="tree-canvas"
+    [class.dragging]="dragging()"
+    [style.background-position]="view().x + 'px ' + view().y + 'px'"
+    [style.background-size]="24 * view().z + 'px ' + 24 * view().z + 'px'"
+    aria-label="Family tree canvas. Drag or use the arrow keys to move, + and - to zoom."
+    tabindex="0"
+    (pointerdown)="down($event)"
+    (pointermove)="move($event)"
+    (pointerup)="up($event)"
+    (pointercancel)="up($event)"
+    (wheel)="wheel($event)"
+    (keydown)="key($event)"
+  >
+    <div class="world" [style.transform]="'translate(' + view().x + 'px, ' + view().y + 'px) scale(' + view().z + ')'">
+      @if (root(); as person) {
+      <app-person-card class="node" [person]="person" (edit)="editing.set(person)"></app-person-card>
+      }
     </div>
+
+    @if (!root()) {
+    <div class="status">
+      @if (loadError()) {
+      <ion-text color="danger"><p>{{ loadError() }}</p></ion-text>
+      <ion-button (click)="load()">Try again</ion-button>
+      } @else {
+      <ion-spinner name="crescent" aria-label="Loading your family tree"></ion-spinner>
+      }
+    </div>
+    }
   </section>
+
+  <div class="zoom" slot="fixed">
+    <ion-button color="light" (click)="zoomBy(1.25)" aria-label="Zoom in">
+      <ion-icon slot="icon-only" name="add"></ion-icon>
+    </ion-button>
+    <ion-button color="light" (click)="zoomBy(0.8)" aria-label="Zoom out">
+      <ion-icon slot="icon-only" name="remove"></ion-icon>
+    </ion-button>
+    <ion-button color="light" (click)="center()" aria-label="Center on me">
+      <ion-icon slot="icon-only" name="locate-outline"></ion-icon>
+    </ion-button>
+  </div>
+
+  <app-person-edit
+    [person]="editing()"
+    [busy]="saving()"
+    [error]="saveError()"
+    (save)="save($event)"
+    (dismissed)="closeEdit()"
+  ></app-person-edit>
 </ion-content>

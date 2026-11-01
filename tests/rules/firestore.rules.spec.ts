@@ -134,6 +134,45 @@ describe('own profile: name and picture', () => {
     assertFails(updateDoc(doc(db('admin'), 'users/alice'), { photo })));
 });
 
+describe('family tree', () => {
+  const person = (extra: Record<string, unknown> = {}) => ({
+    name: 'Alice',
+    birth: '1990-04-01',
+    gender: 'female',
+    parents: [],
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+
+  it('lets an active user create, read, update and delete people in their own tree', async () => {
+    const ref = doc(db('alice'), 'trees/alice/people/alice');
+    await assertSucceeds(setDoc(ref, person()));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(getDocs(collection(db('alice'), 'trees/alice/people')));
+    await assertSucceeds(updateDoc(ref, { name: 'Alice B', updatedAt: serverTimestamp() }));
+    await assertSucceeds(deleteDoc(ref));
+  });
+  it("blocks reading or writing someone else's tree, even for admins", async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trees/alice/people/p1'), { name: 'X' }));
+    await assertFails(getDoc(doc(db('admin'), 'trees/alice/people/p1')));
+    await assertFails(setDoc(doc(db('admin'), 'trees/alice/people/p2'), person()));
+    await assertFails(deleteDoc(doc(db('admin'), 'trees/alice/people/p1')));
+  });
+  it('blocks deactivated and unverified users', async () => {
+    await assertFails(setDoc(doc(db('off'), 'trees/off/people/off'), person()));
+    await assertFails(getDoc(doc(db('alice', false), 'trees/alice/people/alice')));
+  });
+  it('blocks invalid people', async () => {
+    const ref = doc(db('alice'), 'trees/alice/people/p1');
+    await assertFails(setDoc(ref, person({ name: '' })));
+    await assertFails(setDoc(ref, person({ gender: 'robot' })));
+    await assertFails(setDoc(ref, person({ birth: '1 April 1990' })));
+    await assertFails(setDoc(ref, person({ parents: ['a', 'b', 'c'] })));
+    await assertFails(setDoc(ref, person({ extra: true })));
+    await assertFails(setDoc(ref, person({ updatedAt: new Date(0) })));
+  });
+});
+
 describe('other collections', () => {
   it('denies everything else', () => assertFails(getDoc(doc(db('admin'), 'anything/else'))));
 });

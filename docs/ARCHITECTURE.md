@@ -211,6 +211,23 @@ users/{uid}
   photo?:      string   (256x256 WebP/JPEG data URL, at most 70,000 characters)
 ```
 
+```text
+trees/{uid}/people/{personId}   one document per person; the user's own card has personId == uid
+  name:          string (1-100 characters)
+  gender?:       "male" | "female" | "other"
+  birth?, death?, anniversary?:  "YYYY-MM-DD"
+  email?:        string (≤ 254)
+  address?:      string (≤ 500)
+  socials?:      { label, value }[] (≤ 10)
+  parents?:      personId[] (≤ 2)   relationship links, kept on both people
+  children?, spouses?, siblings?:   personId[]
+  updatedAt:     timestamp (server time)
+```
+
+The family tree is stored as plaintext for now. A later step encrypts each
+person in the browser before it is written, so the database only holds
+ciphertext.
+
 ### Security rules (`firestore.rules`)
 
 - All access requires a signed-in user with `email_verified == true`.
@@ -226,6 +243,10 @@ users/{uid}
   never their own role or status (so an admin cannot lock themselves out).
 - Profiles are never deleted: the Auth account would remain and could recreate
   its profile. Deactivate instead.
+- Family tree: only the owner, while active, can read, create, update and
+  delete people in `trees/{uid}/people`. Admins cannot read other users'
+  trees. Writes must match the shape above, and `updatedAt` must be the
+  server time.
 - Every other path is denied.
 
 `tests/rules/firestore.rules.spec.ts` covers these cases against the Firestore

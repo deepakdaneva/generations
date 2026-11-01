@@ -11,6 +11,9 @@ test.beforeAll(() => {
   execFileSync('node', ['scripts/seed-emulators.mjs'], { stdio: 'inherit' });
 });
 
+/** The signed-in user's own card on the home canvas. */
+const ownCard = (page: Page, name: string) => page.locator('app-person-card ion-card-title', { hasText: name });
+
 async function login(page: Page, email: string, password = PASSWORD) {
   await page.goto('/login');
   await page.locator('ion-input[formcontrolname=email] input').fill(email);
@@ -71,7 +74,7 @@ test('redirects signed-out visitors to the login page', async ({ page }) => {
 test('normal user sees Home without the menu and cannot open User Management', async ({ page }) => {
   await login(page, 'user@generations.test');
   await expect(page).toHaveURL(/\/home$/);
-  await expect(page.getByText('Welcome, Test User')).toBeVisible();
+  await expect(ownCard(page, 'Test User')).toBeVisible();
   await expect(page.locator('ion-menu-button')).toBeHidden();
 
   await page.goto('/users');
@@ -90,7 +93,7 @@ test('admin uses the menu to reach User Management and can log out', async ({ pa
 
   await page.locator('ion-searchbar input').fill('test user');
   await expect(page.getByText('user@generations.test')).toBeVisible();
-  await expect(page.getByText('admin@generations.test')).toBeHidden();
+  await expect(page.locator('app-users').getByText('admin@generations.test')).toBeHidden();
   await page.locator('ion-searchbar input').fill('nobody-matches');
   await expect(page.getByText('No users match')).toBeVisible();
   await page.locator('ion-searchbar input').fill('');
@@ -135,7 +138,7 @@ test('self-registration requires email verification and admin approval before si
   await approve(page, email);
   await login(page, email);
   await expect(page).toHaveURL(/\/home$/);
-  await expect(page.getByText('Welcome, New Member')).toBeVisible();
+  await expect(ownCard(page, 'New Member')).toBeVisible();
 });
 
 test('admin creates a user without a password; the user sets their own and signs in', async ({ page }) => {
@@ -161,14 +164,14 @@ test('admin creates a user without a password; the user sets their own and signs
   // Depending on Firebase, the reset link may not count as verification; then
   // the normal verify step applies.
   const verifyPrompt = page.getByText('Verify your email');
-  await expect(page.getByText('Welcome, Invited Member').or(verifyPrompt)).toBeVisible();
+  await expect(ownCard(page, 'Invited Member').or(verifyPrompt)).toBeVisible();
   if (await verifyPrompt.isVisible()) {
     await page.getByRole('button', { name: 'Resend email' }).click();
     await expect(page.getByText('Verification email sent.')).toBeVisible();
     await verifyEmail(email);
     await login(page, email);
   }
-  await expect(page.getByText('Welcome, Invited Member')).toBeVisible();
+  await expect(ownCard(page, 'Invited Member')).toBeVisible();
 });
 
 test('admin creates a user, deactivates them, and the user is blocked', async ({ page }) => {
@@ -223,7 +226,7 @@ test('Google sign-in creates a normal user profile that waits for approval', asy
   await page.getByRole('button', { name: 'Continue with Google' }).click();
   await (await again).getByText(email).click();
   await expect(page).toHaveURL(/\/home$/);
-  await expect(page.getByText('Welcome, Google Member')).toBeVisible();
+  await expect(ownCard(page, 'Google Member')).toBeVisible();
   await expect(page.locator('ion-menu-button')).toBeHidden();
 });
 
@@ -300,7 +303,43 @@ test('profile page: picture is cropped, shrunk and shown; name editable; email l
 
   // Picture stays visible in the profile menu after signing in again.
   await login(page, 'user@generations.test');
-  await expect(page.getByText('Welcome, Renamed User')).toBeVisible();
+  await expect(page.locator('app-person-card')).toBeVisible();
   await page.getByRole('button', { name: 'Profile menu' }).last().click();
   await expect(page.locator('ion-popover ion-item ion-avatar img')).toBeVisible();
+});
+
+test('family tree: own card can be edited and the canvas panned and zoomed', async ({ page }) => {
+  await login(page, 'admin@generations.test');
+  const card = page.locator('app-person-card');
+  await expect(ownCard(page, 'Admin')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit Admin' }).click();
+  const modal = page.locator('ion-modal');
+  await modal.locator('ion-input[formcontrolname=name] input').fill('Ada Admin');
+  await modal.locator('ion-input[formcontrolname=birth] input').fill('1990-04-01');
+  await modal.getByRole('button', { name: 'Add link' }).click();
+  await modal.locator('ion-input[formcontrolname=value] input').fill('@ada');
+  await modal.getByRole('button', { name: 'Save' }).click();
+  await expect(ownCard(page, 'Ada Admin')).toBeVisible();
+  await expect(card).toContainText('Instagram: @ada');
+
+  // Saved in Firestore: still there after a reload.
+  await page.reload();
+  await expect(ownCard(page, 'Ada Admin')).toBeVisible();
+  await expect(card).toContainText('1990');
+
+  // Drag the empty canvas: the card moves with it.
+  const before = (await card.boundingBox())!;
+  await page.mouse.move(40, 300);
+  await page.mouse.down();
+  await page.mouse.move(140, 360, { steps: 5 });
+  await page.mouse.up();
+  const after = (await card.boundingBox())!;
+  expect(Math.round(after.x - before.x)).toBe(100);
+  expect(Math.round(after.y - before.y)).toBe(60);
+
+  await page.getByRole('button', { name: 'Zoom out' }).click();
+  await expect.poll(async () => (await card.boundingBox())!.width).toBeLessThan(after.width);
+  await page.getByRole('button', { name: 'Center on me' }).click();
+  await expect.poll(async () => Math.round((await card.boundingBox())!.width)).toBe(Math.round(after.width));
 });

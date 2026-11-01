@@ -11,7 +11,7 @@ web, iOS and Android, and is designed to grow into dedicated native apps later.
 ## Objectives
 
 - A simple, welcoming way to record family members and how they are related.
-- An interactive family-tree canvas (planned for a later iteration).
+- An interactive family-tree canvas (being built step by step).
 - Runs entirely on Firebase, within the free **Spark** plan, with no separate
   backend server.
 - Open source, easy to self-host, and cheap to maintain.
@@ -60,7 +60,12 @@ reasoning behind these choices.
 - **About** (profile button → About, or the version link on the sign-in page):
   version, commit, deployment time, environment, source code, issues, security
   policy, license and copyright. Public, no sign-in needed.
-- Home page with a placeholder canvas for the future family tree.
+- **Family tree (in progress):** the home page is a canvas showing your own
+  card. Drag (mouse or finger) or use the arrow keys to move; scroll, pinch or
+  use the +/- buttons to zoom; the target button re-centers. The pencil on a
+  card edits name, dates of birth, death and anniversary, gender, email,
+  place/address and up to 10 social links. Relatives, photos and encryption
+  follow in later steps.
 - **Installable app (PWA):** add it to the home screen on Android, iOS or
   desktop; it opens full screen, starts offline, and offers a reload when a new
   version is deployed.
@@ -82,9 +87,10 @@ reasoning behind these choices.
 │   │   ├── about/          About page (version, commit, links, license)
 │   │   ├── auth/           Sign-in and registration pages
 │   │   ├── core/           Firebase setup, AuthService, route guards
-│   │   ├── home/           Home page (family-tree canvas placeholder)
+│   │   ├── home/           Home page (family-tree canvas: pan, zoom)
 │   │   ├── profile/        Profile page (name, picture, password reset link)
 │   │   ├── shared/         Floating menu and profile buttons (no header bar)
+│   │   ├── tree/           Family-tree data service, person card, edit form
 │   │   └── users/          User Management page (admins)
 │   ├── assets/             Static assets
 │   ├── environments/       Local vs deployed build settings
