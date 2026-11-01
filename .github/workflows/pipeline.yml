@@ -80,7 +80,7 @@ jobs:
           retention-days: 7
 
   deploy:
-    name: Deploy to ${{ github.ref_name == 'main' && 'Production' || 'UAT' }}
+    name: Deploy
     if: github.event_name == 'push'
     needs: [check, rules, e2e]
     runs-on: ubuntu-latest
