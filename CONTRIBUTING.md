@@ -12,12 +12,14 @@ changes.
 
 ## Branching model
 
-- `main` is the stable branch. It only contains reviewed, approved releases.
-- Work happens on feature branches created from the appropriate base branch
-  (for the initial release, `v0.0.1`).
-- Name branches after the change, for example `feature/user-invites` or
-  `fix/login-error-message`.
-- Changes reach `main` only through a reviewed pull request.
+- `main` is the production branch. It only contains reviewed, approved releases.
+- `development` is the default branch and is deployed to UAT.
+- Work happens on feature branches created from `development`. Name them after
+  the change, for example `feature/user-invites` or `fix/login-error-message`.
+- Feature branches run no CI. Run `npm run lint` and `npm test` locally before
+  opening a pull request.
+- Changes reach `development` through a reviewed pull request with passing CI.
+  Releases reach `main` through a pull request from `development`.
 
 ## Development workflow
 

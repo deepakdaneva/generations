@@ -26,7 +26,65 @@ Both real projects have:
 - The Firebase CLI from this repository: `npx firebase …` (no global install).
 - Sign in once on your machine: `npx firebase login`.
 
-## Deploy to UAT
+## Branches and pipeline
+
+| Branch | Purpose | Pipeline |
+|---|---|---|
+| `main` | Production releases | After a merge: CI, then deploy to Production once the maintainer approves it in GitHub Actions |
+| `development` (default) | Integration, UAT | After a merge: CI, then deploy to UAT |
+| any other (feature) | Day-to-day work | Nothing runs; test locally (`npm run lint`, `npm test`) |
+
+Work flows feature branch → pull request into `development` → UAT, then
+`development` → pull request into `main` → Production. Both `development` and
+`main` are protected by rulesets: no force pushes or deletion, changes only
+through pull requests, and the CI checks must pass.
+
+The workflow is [`.github/workflows/pipeline.yml`](../.github/workflows/pipeline.yml).
+On a pull request into `development` or `main` it runs three parallel jobs:
+lint + unit tests + build, the Firestore rules tests, and the Playwright
+end-to-end tests. On a push to either branch it runs the same jobs and then
+deploys Hosting, Firestore rules and indexes. GitHub Environments bind each
+deployment to its branch: `uat` accepts only `development`, `production`
+accepts only `main` and requires the maintainer's approval.
+
+### Keyless Google access (Workload Identity Federation)
+
+The pipeline holds no Google keys. GitHub issues a short-lived OIDC token for
+the deploy job, and Google exchanges it for credentials of a deploy-only
+service account. Each Firebase project trusts only its own branch and
+environment. Everything below is free and works on the Spark plan.
+
+Setup, once per project (`P` = `generations-uat` / `generations-prod`,
+`ENV` = `uat` / `production`, `BRANCH` = `development` / `main`):
+
+```bash
+gcloud services enable iamcredentials.googleapis.com sts.googleapis.com cloudresourcemanager.googleapis.com --project P
+gcloud iam workload-identity-pools create github --project P --location global --display-name "GitHub Actions"
+gcloud iam workload-identity-pools providers create-oidc generations --project P --location global \
+  --workload-identity-pool github --issuer-uri https://token.actions.githubusercontent.com \
+  --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref,attribute.environment=assertion.environment" \
+  --attribute-condition "assertion.repository_owner_id == '68489729' && assertion.repository == 'deepakdaneva/generations' && assertion.ref == 'refs/heads/BRANCH' && assertion.environment == 'ENV'"
+gcloud iam service-accounts create github-deployer --project P --display-name "GitHub Actions deployer"
+# Least privilege: deploy Hosting, rules and indexes; nothing else.
+for role in firebasehosting.admin firebaserules.admin datastore.indexAdmin serviceusage.serviceUsageConsumer; do
+  gcloud projects add-iam-policy-binding P --member serviceAccount:github-deployer@P.iam.gserviceaccount.com --role roles/$role --condition None
+done
+# Only the matching GitHub environment may act as the service account.
+gcloud iam service-accounts add-iam-policy-binding github-deployer@P.iam.gserviceaccount.com --project P \
+  --role roles/iam.workloadIdentityUser \
+  --member principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/subject/repo:deepakdaneva/generations:environment:ENV
+```
+
+Then set two variables on the GitHub environment `ENV` (Settings →
+Environments): `WIF_PROVIDER` =
+`projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/generations`
+and `DEPLOY_SERVICE_ACCOUNT` = `github-deployer@P.iam.gserviceaccount.com`.
+They are identifiers, not secrets. Forks use their own owner id, repository and
+projects.
+
+## Manual deploy to UAT
+
+The pipeline is the normal path. For a manual deploy from your machine:
 
 ```bash
 npm run deploy:uat
@@ -42,13 +100,10 @@ Always run `npm run test:rules` before deploying rule changes.
 
 ## Production
 
-Production deployment is intentionally **not scripted** until the first
-release is approved. When it is, the equivalent command is:
-
-```bash
-npm run build
-npx firebase deploy --project prod --only hosting,firestore
-```
+Production is deployed only by the pipeline, from `main`, after the maintainer
+approves the run in GitHub Actions. The first release is a pull request from
+`development` into `main`. Before it, enforce App Check on Production
+(Firestore first, then Authentication) as described below.
 
 ## First admin (per environment)
 

@@ -45,14 +45,17 @@ security fixes.
   app's domains in the Google Cloud console.
 - Service-account keys, deploy credentials and passwords are privileged. Never
   commit them, bake them into Docker images, or print them in CI logs. Provide
-  them through local environment variables or GitHub Actions secrets.
+  them through local environment variables. CI/CD uses Workload Identity
+  Federation and stores no Google credentials (see docs/DEPLOYMENT.md).
 - Access to data is enforced by Firestore Security Rules, not by the UI.
 
 ## Repository protections
 
-- `main` is protected by the `protect-main` ruleset: no deletion, no force
-  pushes, and changes only through pull requests with one approval (the
-  maintainer may bypass on a pull request).
+- `main` and `development` are protected by rulesets: no deletion, no force
+  pushes, changes only through pull requests with one approval (the maintainer
+  may bypass on a pull request) and passing CI checks.
+- Deployments use GitHub Environments: `uat` only from `development`,
+  `production` only from `main` and only after the maintainer approves.
 - Secret scanning with push protection, Dependabot alerts and security
   updates, CodeQL default setup and private vulnerability reporting are on.
 - The GitHub Actions token is read-only by default, and workflows from outside

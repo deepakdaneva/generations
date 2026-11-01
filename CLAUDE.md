@@ -6,14 +6,18 @@ Read `README.md` and `docs/ARCHITECTURE.md` before making changes.
 
 ## Hard rules
 
-- Never commit to, push to, or merge into `main`. Initial work happens on
-  `v0.0.1`; later work on feature branches merged through reviewed pull requests.
+- Never commit to, push to, or merge into `main` or `development`. Work happens
+  on feature branches (initially `v0.0.1`) merged into `development` (deploys
+  UAT) through reviewed pull requests; releases go `development` → `main`
+  (deploys Production after approval) by pull request.
 - Firebase **Spark plan only**: no Cloud Functions, no Admin SDK at runtime, no
   external backend, no paid services, unless the maintainer explicitly approves.
 - Authorization lives in Firestore Security Rules. UI checks are convenience only.
 - Never commit secrets (`.env`, service-account JSON, tokens). Firebase web
   client config is public; privileged credentials are not.
-- Deploy only to UAT. Production deployment stays disabled until requested.
+- Deployments run through the GitHub Actions pipeline
+  (`.github/workflows/pipeline.yml`). Manual `npm run deploy:uat` only when the
+  maintainer asks. Never deploy to Production by hand.
 - Never claim a build, test, deployment or CI run succeeded without running it.
 - Local work uses the emulator demo project `demo-generations`; never point
   local runs at a real Firebase project.

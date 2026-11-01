@@ -98,8 +98,10 @@ reasoning behind these choices.
 └── package.json
 ```
 
-Deployment: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). CI/CD workflows are
-added in a later development step.
+Deployment: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Pull requests into
+`development` and `main` run CI in GitHub Actions; merges deploy `development`
+to UAT and `main` to Production. Feature branches run nothing in CI: test them
+locally.
 
 ## Local development
 
@@ -212,8 +214,9 @@ works in whichever Firebase project it is deployed to (UAT, Production, or your
 own fork). The target project is chosen at deploy time.
 
 **Privileged credentials** (service-account keys, CI deploy credentials,
-passwords) must never be committed. They are supplied through local environment
-variables or GitHub Actions secrets. See [`.env.example`](.env.example) and
+passwords) must never be committed. The CI/CD pipeline needs none: it reaches
+Google through Workload Identity Federation. Local tools use your own sign-in
+or environment variables. See [`.env.example`](.env.example) and
 [SECURITY.md](SECURITY.md).
 
 ## Contributing
