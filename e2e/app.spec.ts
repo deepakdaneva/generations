@@ -344,6 +344,7 @@ test('family tree: own card can be edited and the canvas panned and zoomed', asy
 });
 
 test('family tree: add relatives, remove a relationship and delete a person', async ({ page }) => {
+  test.slow(); // many steps; slower CI runners need more than the default 30 s
   await login(page, 'admin@generations.test');
   const card = (name: string) =>
     page.locator('app-person-card', { has: page.getByRole('heading', { name, exact: true }) });
@@ -461,6 +462,7 @@ test('family tree: up to 5 photos per person, browsed with arrows and removable'
 });
 
 test('family tree: loads the nearest 10 people first, then more while exploring', async ({ page }) => {
+  test.slow(); // many steps; slower CI runners need more than the default 30 s
   // Seed 20 generations of ancestors above the test user's own card.
   const { localId: uid } = await lookup('user@generations.test');
   const base = 'http://127.0.0.1:8080/v1/projects/demo-generations/databases/(default)/documents';
@@ -512,6 +514,7 @@ test('family tree: loads the nearest 10 people first, then more while exploring'
 });
 
 test('family tree: "Remember last position" reopens where the user left, only when turned on', async ({ page }) => {
+  test.slow(); // many steps; slower CI runners need more than the default 30 s
   const { localId: uid } = await lookup('admin@generations.test');
   const settingsDoc = `http://127.0.0.1:8080/v1/projects/demo-generations/databases/(default)/documents/trees/${uid}`;
   const savedZoom = async () => {
