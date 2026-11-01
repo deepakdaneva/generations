@@ -1,0 +1,21 @@
+# Keeps a release pull request open on development. It bumps the version in
+# package.json from the Conventional Commit messages (fix: patch, feat: minor)
+# and updates CHANGELOG.md. Merging it tags the release (vX.Y.Z) and publishes a
+# GitHub Release; the merge itself deploys to UAT like any other change.
+name: Release Please
+
+on:
+  push:
+    branches: [development]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          target-branch: development

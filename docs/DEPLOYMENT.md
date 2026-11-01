@@ -88,10 +88,31 @@ and `DEPLOY_SERVICE_ACCOUNT` = `github-deployer@P.iam.gserviceaccount.com`.
 They are identifiers, not secrets. Forks use their own owner id, repository and
 projects.
 
-To see which build is live, look at the sign-in page (e.g. `v0.0.1 (75c4bb8)`)
-or the About page, which also shows the full commit, deployment time and
-environment. The commit matches the one the pipeline deployed. Local runs show
-`dev`.
+To see which build is live, look at the sign-in page (e.g.
+`v0.1.0 build 42 (75c4bb8)`) or the About page, which also shows the full
+commit, deployment time and environment. Local runs show `dev`.
+
+### Versioning
+
+- **Version** (`0.1.0`): semantic version from `package.json`, managed by
+  [Release Please](https://github.com/googleapis/release-please)
+  (`.github/workflows/release-please.yml`). After each merge into
+  `development` it updates an open "release" pull request that bumps the
+  version from the Conventional Commit titles and updates `CHANGELOG.md`.
+  Merge that pull request when you want a new version: it creates the tag
+  `vX.Y.Z` and a GitHub Release, and the merge deploys to UAT as usual. Then
+  release `development` → `main` for Production.
+- **Build** (`42`): the pipeline run number, added automatically at deploy
+  time. It grows with every run, so each deployment is recognisable without
+  any commit.
+
+Release Please opens pull requests with the built-in `GITHUB_TOKEN`, which
+needs "Allow GitHub Actions to create and approve pull requests" (Settings →
+Actions → General). GitHub does not start workflows for pull requests opened
+by that token, so the release pull request shows no CI checks; merge it with
+the maintainer bypass. It only changes `package.json`, `package-lock.json`,
+`CHANGELOG.md` and `.release-please-manifest.json`, and the push to
+`development` runs the full pipeline before deploying.
 
 ## Manual deploy to UAT
 

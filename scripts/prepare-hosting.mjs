@@ -17,12 +17,15 @@ const robots = /-(uat|dev|test|staging)$/.test(project) ? 'noindex, nofollow' : 
 // Build details shown on the login and About pages (src/app/core/version.ts).
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const commit = (process.env.GITHUB_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })).trim();
-const appVersion = `v${version} (${commit.slice(0, 7)})`;
+// Pipeline run number: grows with every deployment. Empty for manual deploys.
+const buildNumber = process.env.GITHUB_RUN_NUMBER ?? '';
+const appVersion = `v${version}${buildNumber && ` build ${buildNumber}`} (${commit.slice(0, 7)})`;
 
 const values = {
   __SITE_URL__: siteUrl,
   __ROBOTS__: robots,
   __APP_VERSION__: version,
+  __APP_BUILD__: buildNumber,
   __APP_COMMIT__: commit,
   __APP_BUILT__: new Date().toISOString(),
   __APP_PROJECT__: project,

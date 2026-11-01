@@ -31,12 +31,18 @@ security fixes.
 
 ## Known, accepted advisories
 
-- `npm audit` reports high-severity issues in `@grpc/grpc-js` through the
-  `firebase` package. They affect gRPC **servers** in Node.js; the browser
-  build uses WebChannel and does not ship that code. `npm audit fix --force`
-  would wrongly downgrade Firebase to v9, so we wait for a Firebase release.
-- Remaining moderate findings are in development-only tools (test runners,
-  linters) and do not reach the deployed app.
+- `firebase` pins `@grpc/grpc-js` to `~1.9` and `firebase-tools` pulls in
+  `uuid@9`, both with known advisories. `package.json` `overrides` lift them to
+  patched versions (`@grpc/grpc-js` 1.14.7+, `uuid` 11.1.1+); the rules and
+  end-to-end tests cover both. Remove an override once upstream catches up.
+- `minimatch` below 11.0.1 (GHSA-g3hv-75wg-m249, denial of service through
+  crafted glob patterns) remains in development tools only: `firebase-tools`,
+  ESLint and their dependencies. They only match patterns from this
+  repository's own configuration, never user input, and v11's API is
+  incompatible with the old versions they require. The alert is dismissed as
+  tolerable risk until those tools update.
+- `npm audit --omit=dev` reports no vulnerabilities in the app's runtime
+  dependencies.
 
 ## Handling secrets
 
