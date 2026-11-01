@@ -394,9 +394,8 @@ test('family tree: own card can be edited and the canvas panned and zoomed', asy
   await expect.poll(async () => Math.round((await card.boundingBox())!.width)).toBe(Math.round(after.width));
 });
 
-test('family tree: add relatives, remove a relationship and delete a person', async ({ page }) => {
-  test.slow(); // many steps; slower CI runners need more than the default 30 s
-  await login(page, await freshUser('Ada Admin'));
+/** Family-tree canvas helpers: find cards, pan to them, add relatives through their buttons. */
+function treeHelpers(page: Page) {
   const card = (name: string) =>
     page.locator('app-person-card', { has: page.getByRole('heading', { name, exact: true }) });
   const modal = page.locator('ion-modal');
@@ -434,6 +433,13 @@ test('family tree: add relatives, remove a relationship and delete a person', as
       .locator('.household', { has: card(name) })
       .locator('.relation')
       .first();
+  return { card, modal, bringIntoView, addRelative, label };
+}
+
+test('family tree: add relatives, remove a relationship and delete a person', async ({ page }) => {
+  test.slow(); // many steps; slower CI runners need more than the default 30 s
+  await login(page, await freshUser('Ada Admin'));
+  const { card, modal, bringIntoView, addRelative, label } = treeHelpers(page);
 
   await expect(card('Ada Admin')).toBeVisible();
   await addRelative('Ada Admin', 'Add parent of', 'Father');
@@ -456,7 +462,7 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   const y = async (name: string) => (await card(name).boundingBox())!.y;
   expect(await y('Father')).toBeLessThan(await y('Ada Admin'));
   expect(await y('Kid')).toBeGreaterThan(await y('Ada Admin'));
-  await expect(page.locator('.lines path')).toHaveCount(7); // the child's line comes from both parents
+  await expect(page.locator('.lines path.line')).toHaveCount(7); // the child's line comes from both parents
 
   // Birth order: a new eldest child is drawn left of the younger one.
   await bringIntoView('Ada Admin');
@@ -536,6 +542,41 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await page.locator('ion-alert').getByRole('button', { name: 'Delete' }).click();
   await expect(card('Grandfather')).toBeHidden();
   await expect(card('Father')).toBeVisible();
+});
+
+test('family tree: two brothers marry two sisters already in the tree; crossing lines show a gap', async ({ page }) => {
+  test.slow(); // many steps; slower CI runners need more than the default 30 s
+  await login(page, await freshUser('Sam'));
+  const { card, modal, bringIntoView, addRelative, label } = treeHelpers(page);
+  await expect(card('Sam')).toBeVisible();
+  await addRelative('Sam', 'Add sibling right of', 'Brother');
+  await addRelative('Sam', 'Add spouse of', 'Dia', 'Female');
+  await addRelative('Dia', 'Add parent of', 'Her father');
+  await addRelative('Dia', 'Add sibling right of', 'Dora', 'Female');
+
+  // Brother marries Dora, who is already in the tree.
+  await bringIntoView('Brother');
+  await card('Brother').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
+  await page.getByRole('button', { name: 'Add spouse of Brother' }).click();
+  await modal.locator('ion-segment-button[value=existing]').click();
+  await modal.locator('ion-searchbar input').fill('Do');
+  await modal.getByRole('radio', { name: /Dora/ }).click();
+  await modal.getByRole('button', { name: 'Save' }).click();
+  await expect(modal.locator('form, ion-searchbar')).toHaveCount(0);
+
+  // Dora joins Brother's stack and keeps her line from her father.
+  await expect(page.locator('.household', { has: card('Brother') }).locator('app-person-card')).toHaveCount(2);
+  await expect(
+    page
+      .locator('.household', { has: card('Dora') })
+      .locator('.relation')
+      .last(),
+  ).toHaveText('Daughter');
+  await expect(label('Sam')).toHaveText('Sibling'); // Sam and Brother: siblings without known parents
+  // Every line has a gap band under it; hovering a stack highlights its families' lines.
+  await expect(page.locator('.lines path.gap')).toHaveCount(await page.locator('.lines path.line').count());
+  await card('Brother').hover();
+  await expect(page.locator('.lines g.highlight').first()).toBeAttached();
 });
 
 test('family tree: up to 5 photos per person, browsed with arrows and removable', async ({ page }) => {

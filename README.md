@@ -88,6 +88,13 @@ reasoning behind these choices.
     Fanned out, a line with a beating heart joins the married couple.
   - A person with a date of death gets a mourning ribbon, a black-and-white
     photo and an "In loving memory · aged N" footer.
+  - Adding a spouse offers **New person** or **Already in your tree**: pick
+    someone already in the tree (search by name) to marry them, e.g. two
+    brothers marrying two sisters. Their own parents, children, siblings and
+    spouses are not offered.
+  - Where lines of different families cross, the line underneath shows a
+    small gap, so crossings don't look like joins. Hovering or tapping a
+    stack highlights the lines to its parents and children.
   - Your own card shows your profile picture until the card has photos of
     its own.
   - Lines to children come from both parents' cards; in a stack, the line

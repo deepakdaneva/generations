@@ -18,8 +18,16 @@
   >
     <div class="world" [style.transform]="'translate(' + view().x + 'px, ' + view().y + 'px) scale(' + view().z + ')'">
       <svg class="lines" aria-hidden="true">
-        @for (line of layout()?.lines; track line.id + $index) {
-        <path [attr.d]="line.d" pathLength="1"></path>
+        <!-- Per family: a band in the background colour under each line, so another family's line
+             crossing it shows a gap (passes over) instead of looking joined. -->
+        @for (g of lineGroups(); track g.family) {
+        <g [class.highlight]="highlighted().has(g.family)">
+          @for (line of g.lines; track line.id + $index) {
+          <path class="gap" [attr.d]="line.d"></path>
+          } @for (line of g.lines; track line.id + $index) {
+          <path class="line" [attr.d]="line.d" pathLength="1"></path>
+          }
+        </g>
         }
       </svg>
 
@@ -27,6 +35,8 @@
       <div
         class="household"
         [class.open]="open() === h.id"
+        (pointerenter)="hovered.set(h.id)"
+        (pointerleave)="hovered.set(null)"
         [style.transform]="'translate(' + h.x + 'px, ' + h.y + 'px)'"
         (pointerdown)="tapHousehold(h.id, $event)"
       >
@@ -118,9 +128,13 @@
     [canDelete]="!!form()?.canDelete"
     [orderSlots]="form()?.orderSlots ?? 0"
     [orderDefault]="form()?.orderDefault ?? 0"
+    [linkable]="!!form()?.spouseOf"
+    [candidates]="candidates()"
     [busy]="saving()"
     [error]="saveError()"
     (save)="save($event)"
+    (findExisting)="findExisting()"
+    (link)="linkSpouse($event)"
     (unlink)="unlink($event)"
     (remove)="remove()"
     (dismissed)="closeForm()"

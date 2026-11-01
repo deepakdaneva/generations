@@ -33,12 +33,29 @@
 
   path {
     fill: none;
+  }
+
+  .gap {
+    stroke: var(--ion-background-color, #fff);
+    stroke-width: 8;
+  }
+
+  .line {
     stroke: var(--ion-color-medium);
     stroke-width: 2;
     stroke-linecap: round;
     // New lines draw themselves in (pathLength="1" makes the dash the whole line).
     stroke-dasharray: 1;
     animation: draw 0.6s ease-out;
+    transition:
+      stroke 0.2s ease,
+      stroke-width 0.2s ease;
+  }
+
+  // Lines to the parents and children of the hovered or open stack.
+  .highlight .line {
+    stroke: var(--ion-color-primary);
+    stroke-width: 3;
   }
 }
 

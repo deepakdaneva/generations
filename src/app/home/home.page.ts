@@ -1,6 +1,7 @@
 import {
   Component,
   DestroyRef,
+  computed,
   afterNextRender,
   effect,
   inject,
@@ -36,11 +37,12 @@ import {
   withPlaceholders,
   type Household,
   type Layout,
+  type Line,
 } from '../tree/layout';
 import { PersonCardComponent, type AddRequest } from '../tree/person-card.component';
 import { PersonEditComponent, type PersonForm } from '../tree/person-edit.component';
 import { PersonProfileComponent } from '../tree/person-profile.component';
-import { childrenOf, pathTo, RelationError, siblingsOf } from '../tree/relations';
+import { childrenOf, pathTo, RelationError, siblingsOf, spouseCandidates } from '../tree/relations';
 import { TreeService, type Person, type SavedView } from '../tree/tree.service';
 import { zoomAt, type View } from '../tree/view';
 
@@ -59,6 +61,8 @@ interface Form {
   /** Birth-order choice for a new child or sibling: positions offered and the preselected one. */
   orderSlots?: number;
   orderDefault?: number;
+  /** Adding a spouse of this person: someone already in the tree can be picked instead. */
+  spouseOf?: string;
   submit: (details: PersonForm) => Promise<unknown>;
 }
 
@@ -96,6 +100,28 @@ export class HomePage {
   protected readonly open = signal<string | null>(null);
   protected readonly loadError = signal<string | null>(null);
   protected readonly form = signal<Form | null>(null);
+  /** Household under the mouse; its families' lines are highlighted (also for the open one). */
+  protected readonly hovered = signal<string | null>(null);
+  /** Lines grouped by family, in drawing order. */
+  protected readonly lineGroups = computed(() => {
+    const groups = new Map<string, Line[]>();
+    for (const line of this.layout()?.lines ?? []) {
+      const g = groups.get(line.family);
+      if (g) g.push(line);
+      else groups.set(line.family, [line]);
+    }
+    return [...groups].map(([family, lines]) => ({ family, lines }));
+  });
+  /** Families (to their parents and to their children) of the hovered or open household. */
+  protected readonly highlighted = computed(() => {
+    const id = this.hovered() ?? this.open();
+    const families = new Set<string>();
+    if (!id) return families;
+    for (const line of this.layout()?.lines ?? []) if (line.id.includes(`${id}:`)) families.add(line.family);
+    return families;
+  });
+  /** People who can be picked as the spouse (null until loaded). */
+  protected readonly candidates = signal<{ id: string; name: string; hint: string }[] | null>(null);
   /** Person whose profile popup is open. */
   protected readonly profileId = signal<string | null>(null);
   protected readonly saving = signal(false);
@@ -483,6 +509,7 @@ export class HomePage {
       canDelete: false,
       orderSlots,
       orderDefault,
+      spouseOf: req.relation === 'spouse' ? of.id : undefined,
       submit: (details) =>
         this.tree.add(of.id, req.relation, details, { otherParent, position: orderSlots ? details.order : undefined }),
     });
@@ -492,6 +519,28 @@ export class HomePage {
     const form = this.form();
     if (!form) return;
     if (await this.run(() => form.submit(details))) this.closeForm();
+  }
+
+  /** "Already in your tree": everyone who could be the spouse, with who their parents are. */
+  async findExisting(): Promise<void> {
+    const of = this.form()?.spouseOf;
+    if (!of || !(await this.run(() => this.tree.loadAll()))) return;
+    const people = this.people();
+    this.candidates.set(
+      spouseCandidates(people, of)
+        .map((id) => {
+          const p = people.get(id)!;
+          const parents = (p.parents ?? []).map((x) => people.get(x)?.name).filter(Boolean);
+          const hint = parents.length ? `${this.relationLabel(id)} of ${parents.join(' and ')}` : '';
+          return { id, name: p.name, hint };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    );
+  }
+
+  async linkSpouse(id: string): Promise<void> {
+    const of = this.form()?.spouseOf;
+    if (of && (await this.run(() => this.tree.linkSpouse(of, id)))) this.closeForm();
   }
 
   async unlink(otherId: string): Promise<void> {
@@ -512,6 +561,7 @@ export class HomePage {
 
   closeForm(): void {
     this.form.set(null);
+    this.candidates.set(null);
     this.saveError.set(null);
   }
 

@@ -179,6 +179,37 @@ export function addRelative(
   return d.result();
 }
 
+/**
+ * Marries two people already in the tree (e.g. two brothers marrying two
+ * sisters). Not for someone already linked to them as spouse, parent, child
+ * or sibling.
+ */
+export function linkSpouse(people: People, a: string, b: string): Change {
+  if (a === b) throw new RelationError("Someone can't marry themselves.");
+  const pa = people.get(a);
+  const pb = people.get(b);
+  if (!pa || !pb) throw new RelationError('Unknown person');
+  if (spouseCandidates(people, a).every((id) => id !== b))
+    throw new RelationError(`${pb.name} is already related to ${pa.name}.`);
+  const d = new Draft(people);
+  list(d.get(a), 'spouses').push(b);
+  list(d.get(b), 'spouses').push(a);
+  return d.result();
+}
+
+/** People who can be linked as `id`'s spouse: everyone except them and their spouses, parents, children and siblings. */
+export function spouseCandidates(people: People, id: string): string[] {
+  const p = people.get(id);
+  const close = new Set([
+    id,
+    ...(p?.spouses ?? []),
+    ...(p?.parents ?? []),
+    ...(p?.children ?? []),
+    ...siblingsOf(people, id),
+  ]);
+  return [...people.keys()].filter((x) => !close.has(x));
+}
+
 /** Removes every link between `a` and `b` from both; if they are in a sibling group, `b` leaves it. */
 function cut(d: Draft, a: string, b: string): void {
   for (const [from, to] of [

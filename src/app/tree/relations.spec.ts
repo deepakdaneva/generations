@@ -1,6 +1,8 @@
 import {
   addRelative,
   deletePerson,
+  linkSpouse,
+  spouseCandidates,
   pathTo,
   RelationError,
   reorder,
@@ -127,6 +129,30 @@ describe('deletePerson', () => {
 
   it("refuses to delete the user's own card", () => {
     expect(() => deletePerson(tree, 'me', 'me')).toThrow(RelationError);
+  });
+});
+
+describe('linkSpouse', () => {
+  it('marries two people already in the tree: two brothers and two sisters', () => {
+    add('me', 'parent', 'pa');
+    add('me', 'sibling', 'bro');
+    add('me', 'spouse', 'd1');
+    add('d1', 'parent', 'pb');
+    add('d1', 'sibling', 'd2');
+    expect(spouseCandidates(tree, 'bro')).toContain('d2');
+    expect(spouseCandidates(tree, 'bro')).not.toContain('me'); // his brother
+    tree = apply(tree, linkSpouse(tree, 'bro', 'd2'));
+    expect(get('bro').spouses).toEqual(['d2']);
+    expect(get('d2').spouses).toEqual(['bro']);
+    expect(get('d2').parents).toEqual(['pb']);
+  });
+
+  it('refuses close relatives and existing spouses', () => {
+    add('me', 'parent', 'dad');
+    add('me', 'spouse', 'wife');
+    expect(() => linkSpouse(tree, 'me', 'dad')).toThrow(RelationError);
+    expect(() => linkSpouse(tree, 'me', 'wife')).toThrow(RelationError);
+    expect(() => linkSpouse(tree, 'me', 'me')).toThrow(RelationError);
   });
 });
 

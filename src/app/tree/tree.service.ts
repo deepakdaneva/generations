@@ -18,7 +18,16 @@ import { AuthService } from '../core/auth.service';
 import { AvatarError, toPhotoDataUrl } from '../core/avatar';
 import { FIRESTORE } from '../core/firebase';
 
-import { addRelative, deletePerson, neighbors, reorder, unlink, type Change, type Relation } from './relations';
+import {
+  addRelative,
+  deletePerson,
+  linkSpouse,
+  neighbors,
+  reorder,
+  unlink,
+  type Change,
+  type Relation,
+} from './relations';
 
 export type Gender = 'male' | 'female' | 'other';
 
@@ -263,6 +272,12 @@ export class TreeService {
     await this.loadMore(neighbors(this.people().get(id)!));
     const parents = this.people().get(id)?.parents ?? [];
     await this.loadMore(parents.flatMap((p) => this.people().get(p)?.children ?? []));
+  }
+
+  /** Marries two people already in the tree. */
+  async linkSpouse(a: string, b: string): Promise<void> {
+    await this.loadAll();
+    await this.commit(linkSpouse(this.people(), a, b));
   }
 
   async unlink(a: string, b: string): Promise<void> {

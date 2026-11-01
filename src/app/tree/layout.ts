@@ -48,6 +48,8 @@ export interface Household {
 export interface Line {
   id: string;
   d: string;
+  /** The family node (set of parents) the line belongs to: lines of one family join, others only cross. */
+  family: string;
 }
 
 export interface Layout {
@@ -274,8 +276,10 @@ export async function layoutTree(people: People, rootId: string): Promise<Layout
       (e.sections ?? []).map((s) => {
         const start = backDown.has(e.sources[0]) ? { x: s.startPoint.x, y: s.startPoint.y + DROP } : s.startPoint;
         const end = back.has(e.targets[0]) ? { x: s.endPoint.x, y: s.endPoint.y - DROP } : s.endPoint;
+        const from = e.sources[0];
         return {
           id: e.id,
+          family: from.startsWith('h:') ? e.targets[0] : from,
           d: roundedPath([start, ...(s.bendPoints ?? []), end].map((p) => ({ x: p.x - ox, y: p.y - oy }))),
         };
       }),

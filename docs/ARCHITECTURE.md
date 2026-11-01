@@ -184,6 +184,12 @@ of a home-made algorithm. It is the only new runtime dependency.
   label). Fanned out, a marriage line with a beating heart joins each spouse
   to their partner at photo height.
 - A man's card is the front card of his stack (the first male member).
+- Two people already in the tree can be married (`linkSpouse`, e.g. two
+  brothers marrying two sisters); each keeps the line from their own parents,
+  so lines of different families can cross. Lines are drawn per family, each
+  over a wider band in the background colour: a later family's line crossing
+  an earlier one leaves a gap in it, while lines of one family still join.
+  Hovering or tapping a stack highlights the families it belongs to.
 - Lines to children leave from each parent's own port at the bottom of the
   stack (the front card's middle, or the visible edge of a card behind), so a
   child's line comes from both parents. Like the lines on top, lines from a

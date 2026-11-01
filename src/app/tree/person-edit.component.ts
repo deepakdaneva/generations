@@ -1,4 +1,4 @@
-import { Component, computed, effect, input, output } from '@angular/core';
+import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators, type ValidatorFn } from '@angular/forms';
 import {
   IonButton,
@@ -12,6 +12,11 @@ import {
   IonListHeader,
   IonLabel,
   IonModal,
+  IonRadio,
+  IonRadioGroup,
+  IonSearchbar,
+  IonSegment,
+  IonSegmentButton,
   IonSelect,
   IonSelectOption,
   IonSpinner,
@@ -55,6 +60,11 @@ const social = (label = 'Instagram', value = '') =>
     IonListHeader,
     IonLabel,
     IonModal,
+    IonRadio,
+    IonRadioGroup,
+    IonSearchbar,
+    IonSegment,
+    IonSegmentButton,
     IonSelect,
     IonSelectOption,
     IonSpinner,
@@ -84,162 +94,201 @@ const social = (label = 'Instagram', value = '') =>
           </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">
-          <form [formGroup]="form" (ngSubmit)="submit()" class="fields">
-            <ion-input
-              formControlName="name"
-              label="Name"
-              labelPlacement="floating"
-              fill="outline"
-              errorText="Enter a name (up to 100 characters)"
-            ></ion-input>
-            <div class="row">
-              <ion-input
-                formControlName="birth"
-                type="date"
-                label="Date of birth"
-                labelPlacement="stacked"
-                fill="outline"
-              ></ion-input>
-              <ion-input
-                formControlName="death"
-                type="date"
-                label="Date of death"
-                labelPlacement="stacked"
-                fill="outline"
-              ></ion-input>
-            </div>
-            <div class="row">
-              <ion-select
-                formControlName="gender"
-                label="Gender *"
-                labelPlacement="floating"
-                fill="outline"
-                interface="popover"
-                errorText="Choose a gender"
-              >
-                <ion-select-option value="female">Female</ion-select-option>
-                <ion-select-option value="male">Male</ion-select-option>
-                <ion-select-option value="other">Other</ion-select-option>
-              </ion-select>
-              <ion-input
-                formControlName="anniversary"
-                type="date"
-                label="Anniversary"
-                labelPlacement="stacked"
-                fill="outline"
-              ></ion-input>
-            </div>
-            @if (orderSlots() > 1) {
-              <ion-select
-                formControlName="order"
-                label="Birth order"
-                labelPlacement="floating"
-                fill="outline"
-                interface="popover"
-                helperText="Siblings are shown eldest to youngest, left to right."
-              >
-                @for (slot of slotList(); track slot) {
-                  <ion-select-option [value]="slot">{{ ordinalLabel(slot) }}</ion-select-option>
+          @if (linkable()) {
+            <ion-segment [value]="mode()" (ionChange)="setMode($event.detail.value)">
+              <ion-segment-button value="new"><ion-label>New person</ion-label></ion-segment-button>
+              <ion-segment-button value="existing"><ion-label>Already in your tree</ion-label></ion-segment-button>
+            </ion-segment>
+          }
+          @if (mode() === 'existing') {
+            <ion-searchbar
+              placeholder="Search by name"
+              [debounce]="150"
+              (ionInput)="query.set($event.detail.value ?? '')"
+            ></ion-searchbar>
+            @if (candidates(); as list) {
+              <ion-radio-group [value]="picked()" (ionChange)="pick($event.detail.value)">
+                @for (c of filtered(); track c.id) {
+                  <ion-item>
+                    <ion-radio [value]="c.id" justify="space-between">
+                      <ion-label>
+                        {{ c.name }}
+                        @if (c.hint) {
+                          <p>{{ c.hint }}</p>
+                        }
+                      </ion-label>
+                    </ion-radio>
+                  </ion-item>
+                } @empty {
+                  <ion-item lines="none"><ion-label color="medium">No one found</ion-label></ion-item>
                 }
-              </ion-select>
+              </ion-radio-group>
+            } @else {
+              <div class="ion-text-center ion-padding"><ion-spinner aria-label="Loading your tree"></ion-spinner></div>
             }
-            <ion-input
-              formControlName="email"
-              type="email"
-              label="Email"
-              labelPlacement="floating"
-              fill="outline"
-              errorText="Enter a valid email address"
-            ></ion-input>
-            <ion-textarea
-              formControlName="address"
-              label="Place / address"
-              labelPlacement="floating"
-              fill="outline"
-              [autoGrow]="true"
-              [counter]="true"
-              maxlength="500"
-            ></ion-textarea>
-
-            <ion-list formArrayName="socials">
-              <ion-list-header><ion-label>Social profiles and links</ion-label></ion-list-header>
-              @for (group of socials.controls; track group; let i = $index) {
-                <ion-item lines="none" [formGroupName]="i">
-                  <ion-select
-                    formControlName="label"
-                    aria-label="Type"
-                    interface="popover"
-                    slot="start"
-                    class="social-label"
-                  >
-                    @for (l of labels; track l) {
-                      <ion-select-option [value]="l">{{ l }}</ion-select-option>
-                    }
-                  </ion-select>
-                  <ion-input
-                    formControlName="value"
-                    aria-label="Handle or link"
-                    placeholder="@handle or link"
-                  ></ion-input>
-                  <ion-button
-                    slot="end"
-                    fill="clear"
-                    color="medium"
-                    (click)="socials.removeAt(i)"
-                    aria-label="Remove link"
-                  >
-                    <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-                  </ion-button>
-                </ion-item>
+            @if (pickError() || error()) {
+              <ion-text color="danger"
+                ><p>{{ pickError() || error() }}</p></ion-text
+              >
+            }
+          } @else {
+            <form [formGroup]="form" (ngSubmit)="submit()" class="fields">
+              <ion-input
+                formControlName="name"
+                label="Name"
+                labelPlacement="floating"
+                fill="outline"
+                errorText="Enter a name (up to 100 characters)"
+              ></ion-input>
+              <div class="row">
+                <ion-input
+                  formControlName="birth"
+                  type="date"
+                  label="Date of birth"
+                  labelPlacement="stacked"
+                  fill="outline"
+                ></ion-input>
+                <ion-input
+                  formControlName="death"
+                  type="date"
+                  label="Date of death"
+                  labelPlacement="stacked"
+                  fill="outline"
+                ></ion-input>
+              </div>
+              <div class="row">
+                <ion-select
+                  formControlName="gender"
+                  label="Gender *"
+                  labelPlacement="floating"
+                  fill="outline"
+                  interface="popover"
+                  errorText="Choose a gender"
+                >
+                  <ion-select-option value="female">Female</ion-select-option>
+                  <ion-select-option value="male">Male</ion-select-option>
+                  <ion-select-option value="other">Other</ion-select-option>
+                </ion-select>
+                <ion-input
+                  formControlName="anniversary"
+                  type="date"
+                  label="Anniversary"
+                  labelPlacement="stacked"
+                  fill="outline"
+                ></ion-input>
+              </div>
+              @if (orderSlots() > 1) {
+                <ion-select
+                  formControlName="order"
+                  label="Birth order"
+                  labelPlacement="floating"
+                  fill="outline"
+                  interface="popover"
+                  helperText="Siblings are shown eldest to youngest, left to right."
+                >
+                  @for (slot of slotList(); track slot) {
+                    <ion-select-option [value]="slot">{{ ordinalLabel(slot) }}</ion-select-option>
+                  }
+                </ion-select>
               }
-            </ion-list>
-            @if (socials.length < maxSocials) {
-              <ion-button fill="clear" size="small" (click)="socials.push(social())">
-                <ion-icon slot="start" name="add-outline"></ion-icon>Add link
+              <ion-input
+                formControlName="email"
+                type="email"
+                label="Email"
+                labelPlacement="floating"
+                fill="outline"
+                errorText="Enter a valid email address"
+              ></ion-input>
+              <ion-textarea
+                formControlName="address"
+                label="Place / address"
+                labelPlacement="floating"
+                fill="outline"
+                [autoGrow]="true"
+                [counter]="true"
+                maxlength="500"
+              ></ion-textarea>
+
+              <ion-list formArrayName="socials">
+                <ion-list-header><ion-label>Social profiles and links</ion-label></ion-list-header>
+                @for (group of socials.controls; track group; let i = $index) {
+                  <ion-item lines="none" [formGroupName]="i">
+                    <ion-select
+                      formControlName="label"
+                      aria-label="Type"
+                      interface="popover"
+                      slot="start"
+                      class="social-label"
+                    >
+                      @for (l of labels; track l) {
+                        <ion-select-option [value]="l">{{ l }}</ion-select-option>
+                      }
+                    </ion-select>
+                    <ion-input
+                      formControlName="value"
+                      aria-label="Handle or link"
+                      placeholder="@handle or link"
+                    ></ion-input>
+                    <ion-button
+                      slot="end"
+                      fill="clear"
+                      color="medium"
+                      (click)="socials.removeAt(i)"
+                      aria-label="Remove link"
+                    >
+                      <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+                    </ion-button>
+                  </ion-item>
+                }
+              </ion-list>
+              @if (socials.length < maxSocials) {
+                <ion-button fill="clear" size="small" (click)="socials.push(social())">
+                  <ion-icon slot="start" name="add-outline"></ion-icon>Add link
+                </ion-button>
+              }
+              @if (error()) {
+                <ion-text color="danger"
+                  ><p>{{ error() }}</p></ion-text
+                >
+              }
+              <button type="submit" hidden></button>
+            </form>
+
+            @if (relations().length) {
+              <ion-list>
+                <ion-list-header><ion-label>Relationships</ion-label></ion-list-header>
+                @for (r of relations(); track r.id) {
+                  <ion-item>
+                    <ion-label>
+                      {{ r.name }}
+                      <p>{{ r.label }}</p>
+                    </ion-label>
+                    <ion-button
+                      slot="end"
+                      fill="clear"
+                      color="medium"
+                      (click)="unlink.emit(r.id)"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Remove relationship with ' + r.name"
+                    >
+                      <ion-icon slot="icon-only" name="unlink-outline"></ion-icon>
+                    </ion-button>
+                  </ion-item>
+                }
+              </ion-list>
+            }
+            @if (canDelete()) {
+              <ion-button
+                class="ion-margin-top"
+                expand="block"
+                fill="outline"
+                color="danger"
+                (click)="remove.emit()"
+                [disabled]="busy()"
+              >
+                <ion-icon slot="start" name="trash-outline"></ion-icon>Delete person
               </ion-button>
             }
-            @if (error()) {
-              <ion-text color="danger"
-                ><p>{{ error() }}</p></ion-text
-              >
-            }
-            <button type="submit" hidden></button>
-          </form>
-
-          @if (relations().length) {
-            <ion-list>
-              <ion-list-header><ion-label>Relationships</ion-label></ion-list-header>
-              @for (r of relations(); track r.id) {
-                <ion-item>
-                  <ion-label>
-                    {{ r.name }}
-                    <p>{{ r.label }}</p>
-                  </ion-label>
-                  <ion-button
-                    slot="end"
-                    fill="clear"
-                    color="medium"
-                    (click)="unlink.emit(r.id)"
-                    [disabled]="busy()"
-                    [attr.aria-label]="'Remove relationship with ' + r.name"
-                  >
-                    <ion-icon slot="icon-only" name="unlink-outline"></ion-icon>
-                  </ion-button>
-                </ion-item>
-              }
-            </ion-list>
-          }
-          @if (canDelete()) {
-            <ion-button
-              class="ion-margin-top"
-              expand="block"
-              fill="outline"
-              color="danger"
-              (click)="remove.emit()"
-              [disabled]="busy()"
-            >
-              <ion-icon slot="start" name="trash-outline"></ion-icon>Delete person
-            </ion-button>
           }
         </ion-content>
       </ng-template>
@@ -273,6 +322,14 @@ export class PersonEditComponent {
   readonly orderSlots = input(0);
   /** Preselected birth order (0 = eldest). */
   readonly orderDefault = input(0);
+  /** Adding a spouse: also offer someone already in the tree. */
+  readonly linkable = input(false);
+  /** People who can be picked (null while loading). */
+  readonly candidates = input<{ id: string; name: string; hint: string }[] | null>(null);
+  /** "Already in your tree" was chosen: the candidates are needed. */
+  readonly findExisting = output<void>();
+  /** Save with someone already in the tree picked. */
+  readonly link = output<string>();
   readonly unlink = output<string>();
   readonly remove = output<void>();
   readonly busy = input(false);
@@ -296,6 +353,14 @@ export class PersonEditComponent {
     socials: this.socials,
     order: new FormControl(0, { nonNullable: true }),
   });
+  protected readonly mode = signal<'new' | 'existing'>('new');
+  protected readonly query = signal('');
+  protected readonly picked = signal<string | null>(null);
+  protected readonly pickError = signal<string | null>(null);
+  protected readonly filtered = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    return (this.candidates() ?? []).filter((c) => c.name.toLowerCase().includes(q));
+  });
   protected readonly slotList = computed(() => Array.from({ length: this.orderSlots() }, (_, i) => i));
 
   /** "1st (eldest)", "2nd", ..., "4th (youngest)". */
@@ -311,6 +376,10 @@ export class PersonEditComponent {
     effect(() => {
       const p = this.person();
       if (!p) return;
+      this.mode.set('new');
+      this.query.set('');
+      this.picked.set(null);
+      this.pickError.set(null);
       this.socials.clear();
       for (const s of p.socials ?? []) this.socials.push(social(s.label, s.value));
       this.form.reset({
@@ -326,7 +395,23 @@ export class PersonEditComponent {
     });
   }
 
+  protected setMode(value: unknown): void {
+    this.mode.set(value === 'existing' ? 'existing' : 'new');
+    if (value === 'existing' && !this.candidates()) this.findExisting.emit();
+  }
+
+  protected pick(value: unknown): void {
+    this.picked.set(typeof value === 'string' ? value : null);
+    this.pickError.set(null);
+  }
+
   protected submit(): void {
+    if (this.mode() === 'existing') {
+      const id = this.picked();
+      if (id) this.link.emit(id);
+      else this.pickError.set('Choose a person');
+      return;
+    }
     if (this.form.invalid || !this.form.value.name?.trim()) {
       this.form.markAllAsTouched();
       return;
