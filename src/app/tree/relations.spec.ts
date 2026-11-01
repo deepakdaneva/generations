@@ -1,6 +1,7 @@
 import {
   addRelative,
   deletePerson,
+  hasLivingSpouse,
   linkSpouse,
   spouseCandidates,
   pathTo,
@@ -129,6 +130,26 @@ describe('deletePerson', () => {
 
   it("refuses to delete the user's own card", () => {
     expect(() => deletePerson(tree, 'me', 'me')).toThrow(RelationError);
+  });
+});
+
+describe('marrying again', () => {
+  it('adds no second spouse while the first is alive; a widow or widower can marry again', () => {
+    add('me', 'spouse', 'first');
+    expect(hasLivingSpouse(tree, 'me')).toBe(true);
+    expect(() => add('me', 'spouse', 'second')).toThrow(/already married/);
+    tree.set('first', { ...get('first'), death: '2020-01-01' });
+    expect(hasLivingSpouse(tree, 'me')).toBe(false);
+    add('me', 'spouse', 'second');
+    expect(get('me').spouses).toEqual(['first', 'second']);
+  });
+
+  it('offers no one married to someone alive', () => {
+    add('me', 'sibling', 'bro');
+    add('me', 'spouse', 'wife');
+    add('wife', 'sibling', 'sis');
+    expect(spouseCandidates(tree, 'bro')).toEqual(['sis']);
+    expect(() => linkSpouse(tree, 'bro', 'wife')).toThrow(/already married/);
   });
 });
 

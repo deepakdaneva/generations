@@ -1,15 +1,4 @@
-import {
-  CARD_H,
-  CARD_W,
-  DROP,
-  downX,
-  households,
-  layoutTree,
-  portX,
-  roundedPath,
-  STACK_OFFSET,
-  withPlaceholders,
-} from './layout';
+import { CARD_H, CARD_W, cardMid, households, layoutTree, roundedPath, withPlaceholders } from './layout';
 import type { Person } from './tree.service';
 
 const people = new Map<string, Person>(
@@ -24,7 +13,7 @@ const people = new Map<string, Person>(
 );
 
 describe('family layout', () => {
-  it('groups spouses into households, own card in front', () => {
+  it('groups spouses into households, own card first', () => {
     // Depth-first: the own family (parents, then their other children) before the children.
     expect(households(people, 'me')).toEqual([['me', 'wife'], ['dad', 'mum'], ['sis'], ['kid']]);
   });
@@ -37,7 +26,7 @@ describe('family layout', () => {
     expect(y('kid')).toBeGreaterThan(y('me'));
     expect(y('sis')).toBe(y('me')); // same row, whatever the stack size
     expect(x('sis')).toBeLessThan(x('me')); // listed before "me" by the parents
-    // Own front card centered on (0, 0).
+    // Own card centered on (0, 0).
     expect(x('me') + CARD_W / 2).toBe(0);
     expect(y('me') + CARD_H / 2).toBe(0);
     expect(lines.length).toBeGreaterThanOrEqual(4);
@@ -67,37 +56,29 @@ describe('family layout', () => {
     expect(h('wdad').x).toBeGreaterThan(h('uncle').x); // ...outside his parents' families
   });
 
-  it("puts a man's card in front of his stack and still centers on the own card", async () => {
+  it("puts a man's card first, his wife beside him, and still centers on the own card", async () => {
     const tree = new Map(people);
     tree.set('me', { ...people.get('me')!, gender: 'female' });
     tree.set('wife', { ...people.get('wife')!, name: 'Husband', gender: 'male' });
     expect(households(tree, 'me')[0]).toEqual(['wife', 'me']);
     const { households: hs } = await layoutTree(tree, 'me');
     const h = hs.find((hh) => hh.members.includes('me'))!;
-    // Own card is second in the stack: one step right and up from the front card.
-    expect(h.x + STACK_OFFSET + CARD_W / 2).toBe(0);
-    expect(h.y - STACK_OFFSET + CARD_H / 2).toBe(0);
+    // Own card is the second card, side by side with the husband's.
+    expect(h.x + cardMid(1)).toBe(0);
+    expect(h.y + CARD_H / 2).toBe(0);
   });
 
-  it('stops lines to a card behind the front one above the stack, at its own port', async () => {
+  it("draws lines straight to a spouse's own card, and a child's line from both parents' cards", async () => {
     const tree = new Map(people);
     tree.set('wife', { ...people.get('wife')!, parents: ['wdad'] });
     tree.set('wdad', { id: 'wdad', name: 'Wife dad', children: ['wife'] });
     const { households: hs, lines } = await layoutTree(tree, 'me');
     const h = hs.find((hh) => hh.members.includes('wife'))!;
-    const line = lines.find((l) => l.id.endsWith(':wife'))!;
-    expect(line.d.endsWith(`L${h.x + portX(1)},${h.y - DROP}`)).toBe(true);
-  });
-
-  it("draws a child's line from both parents' cards", async () => {
-    const { households: hs, lines } = await layoutTree(people, 'me');
-    const h = hs.find((hh) => hh.members.includes('me'))!;
     expect(h.members).toEqual(['me', 'wife']);
-    expect(h.parent).toEqual([true, true]);
+    expect(lines.find((l) => l.id.endsWith(':wife'))!.d.endsWith(`L${h.x + cardMid(1)},${h.y}`)).toBe(true);
     const from = (m: string) => lines.find((l) => l.id.startsWith(`h:me:down:${m}>`))!;
-    expect(from('me').d.startsWith(`M${h.x + downX(0)},${h.y + CARD_H} `)).toBe(true);
-    // The household draws the first stretch from the card behind (stacked or fanned out).
-    expect(from('wife').d.startsWith(`M${h.x + downX(1)},${h.y + CARD_H + DROP} `)).toBe(true);
+    expect(from('me').d.startsWith(`M${h.x + cardMid(0)},${h.y + CARD_H} `)).toBe(true);
+    expect(from('wife').d.startsWith(`M${h.x + cardMid(1)},${h.y + CARD_H} `)).toBe(true);
   });
 
   it('rounds corners of orthogonal paths', () => {

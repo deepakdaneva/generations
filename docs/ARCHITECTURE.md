@@ -169,31 +169,27 @@ uses [elkjs](https://github.com/kieler/elkjs) (Eclipse Layout Kernel,
 actively maintained, EPL-2.0 OR GPL-3.0; approved by the maintainer) instead
 of a home-made algorithm. It is the only new runtime dependency.
 
-- A person and their spouses form one node (a stack of cards). Each set of
-  parents gets a 1x1 "family" node: the parents' line drops into it and the
-  children's lines leave from it, which draws the classic family-tree bus.
-  Siblings without known parents hang from a family node of their own.
-- Every card in a stack has its own port on top of the node (fixed port
-  positions), and lines from parents end at the port of their child's card.
-  So a spouse's parents connect to the spouse's card and ELK places them on
-  that side. The front card's port is in the middle; the ports of the cards
-  behind it are near their right edge, so the two lines never run side by
-  side. Lines to cards behind the front one stop 56 px above the stack; the
-  household draws the rest, down to the stacked card or, when the stack fans
-  out, across to the card's spread-out position (with the relationship
-  label). Fanned out, a marriage line with a beating heart joins each spouse
-  to their partner at photo height.
-- A man's card is the front card of his stack (the first male member).
+- A person and their spouses form one node, their cards side by side (304 px
+  apart, which leaves room for the add buttons and the heart), the man's card
+  first. Each set of parents gets a 1x1 "family" node: the parents' lines
+  drop into it and the children's lines leave from it, which draws the
+  classic family-tree bus. Siblings without known parents hang from a family
+  node of their own.
+- Every card has its own ports in the middle of its top and bottom edges
+  (fixed port positions). Lines from parents end at the top port of their
+  child's card, so a spouse's parents connect to the spouse's card and ELK
+  places them on that side. Lines to children leave from each parent's
+  bottom port, so a child's line comes from both parents. A marriage line
+  with a beating heart joins spouses at photo height.
+- A new spouse can only be added to someone not married to anyone alive
+  (no date of death): a widow or widower can marry again. The form enforces
+  this (the heart button is hidden), not the security rules.
 - Two people already in the tree can be married (`linkSpouse`, e.g. two
   brothers marrying two sisters); each keeps the line from their own parents,
   so lines of different families can cross. Lines are drawn per family, each
   over a wider band in the background colour: a later family's line crossing
   an earlier one leaves a gap in it, while lines of one family still join.
-  Hovering or tapping a stack highlights the families it belongs to.
-- Lines to children leave from each parent's own port at the bottom of the
-  stack (the front card's middle, or the visible edge of a card behind), so a
-  child's line comes from both parents. Like the lines on top, lines from a
-  card behind start 56 px below the stack and the household draws the rest.
+  Hovering or tapping a couple highlights the families they belong to.
 - Households are given to ELK depth-first from the user's own card, each
   person's family before their spouse's, so the spouse's parents end up
   outside the other partner's parents and their siblings.
@@ -207,8 +203,7 @@ of a home-made algorithm. It is the only new runtime dependency.
   siblings is edited. Gender is required by the form
   only, not by the security rules, because adding a relative also rewrites
   older cards that may have no gender yet.
-- Cards have a fixed size, so the layout never waits for rendering. Only the
-  front card counts toward a stack's height, so rows stay aligned.
+- Cards have a fixed size, so the layout never waits for rendering.
 - ELK is loaded on first use (a lazy chunk of about 340 kB compressed), so it
   is not in the main bundle. It runs on the main thread; its web worker is the
   upgrade path if large trees ever stutter.

@@ -90,6 +90,14 @@ export function siblingsOf(people: People, id: string): string[] {
   return p.parents?.length ? childrenOf(people, p.parents) : (p.siblings ?? [id]);
 }
 
+/**
+ * Whether `id` is married to someone alive (no date of death, or not loaded).
+ * Only then can no new spouse be added: a widow or widower can marry again.
+ */
+export function hasLivingSpouse(people: People, id: string): boolean {
+  return (people.get(id)?.spouses ?? []).some((s) => !people.get(s)?.death);
+}
+
 /** Everyone linked to `id` in any way. */
 export function neighbors(p: Person): string[] {
   return LINKS.flatMap((key) => p[key] ?? []).filter((id) => id !== p.id);
@@ -172,6 +180,7 @@ export function addRelative(
       break;
     }
     case 'spouse':
+      if (hasLivingSpouse(people, x.id)) throw new RelationError(`${x.name} is already married.`);
       p.spouses = [x.id];
       list(x, 'spouses').push(p.id);
       break;
@@ -189,6 +198,7 @@ export function linkSpouse(people: People, a: string, b: string): Change {
   const pa = people.get(a);
   const pb = people.get(b);
   if (!pa || !pb) throw new RelationError('Unknown person');
+  for (const p of [pa, pb]) if (hasLivingSpouse(people, p.id)) throw new RelationError(`${p.name} is already married.`);
   if (spouseCandidates(people, a).every((id) => id !== b))
     throw new RelationError(`${pb.name} is already related to ${pa.name}.`);
   const d = new Draft(people);
@@ -197,7 +207,10 @@ export function linkSpouse(people: People, a: string, b: string): Change {
   return d.result();
 }
 
-/** People who can be linked as `id`'s spouse: everyone except them and their spouses, parents, children and siblings. */
+/**
+ * People who can be linked as `id`'s spouse: everyone except them, their
+ * spouses, parents, children and siblings, and anyone married to someone alive.
+ */
 export function spouseCandidates(people: People, id: string): string[] {
   const p = people.get(id);
   const close = new Set([
@@ -207,7 +220,7 @@ export function spouseCandidates(people: People, id: string): string[] {
     ...(p?.children ?? []),
     ...siblingsOf(people, id),
   ]);
-  return [...people.keys()].filter((x) => !close.has(x));
+  return [...people.keys()].filter((x) => !close.has(x) && !hasLivingSpouse(people, x));
 }
 
 /** Removes every link between `a` and `b` from both; if they are in a sibling group, `b` leaves it. */

@@ -6,41 +6,20 @@ import type { Person } from './tree.service';
 /** Cards have a fixed size so the layout never waits for rendering. */
 export const CARD_W = 260;
 export const CARD_H = 340;
-/**
- * Each spouse card sits this much further up and right behind the front card.
- * Only the front card counts for the layout height, so rows stay aligned.
- */
-export const STACK_OFFSET = 14;
-/** Horizontal step between fanned-out spouse cards (card width plus room for the add buttons). */
-export const SPREAD_STEP = 304;
-/**
- * Lines reach a card's top straight down for at least this long, so the
- * relationship label and the line to a fanned-out spouse card fit above it.
- */
+/** Horizontal step between spouses' cards side by side (card width plus room for the add buttons and the heart). */
+export const SPOUSE_STEP = 304;
+/** Lines reach a card's top straight down for at least this long, so the relationship label fits on them. */
 export const DROP = 56;
-/**
- * Where the line from a spouse's parents reaches a card behind the front one:
- * near its right edge, well apart from the front card's line in the middle.
- */
-export const BACK_PORT = CARD_W - 24;
 
-/** Port (line end) of stack member `i` along the top of the household, relative to its left edge. */
-export const portX = (i: number): number => (i ? i * STACK_OFFSET + BACK_PORT : CARD_W / 2);
+/** Middle of member `i`'s card, relative to the household's left edge: where lines meet the card, top and bottom. */
+export const cardMid = (i: number): number => i * SPOUSE_STEP + CARD_W / 2;
 
-/**
- * Where the line to a parent's children leaves stack member `i` at the bottom:
- * the front card's middle, or the strip of a card behind that shows on the right.
- */
-export const downX = (i: number): number => (i ? i * STACK_OFFSET + CARD_W - STACK_OFFSET / 2 : CARD_W / 2);
-
-/** A person with their spouses, drawn as one stack of cards. Members: front card first; x/y: its top-left. */
+/** A person with their spouses, cards side by side (married couples next to each other). x/y: top-left of the first card. */
 export interface Household {
   id: string;
   members: string[];
   /** Per member: whether a line comes down to their card (from parents or a sibling group). */
   linked: boolean[];
-  /** Per member: whether a line goes from their card to their children. */
-  parent: boolean[];
   x: number;
   y: number;
 }
@@ -81,8 +60,8 @@ export function withPlaceholders(people: People, unloaded: ReadonlySet<string>):
 }
 
 /**
- * Spouses (and spouses of spouses) form one household; a man's card is in
- * front (the first male member), the others follow. Households are listed
+ * Spouses (and spouses of spouses) form one household, side by side; a
+ * man's card comes first (the first male member), the others follow. Households are listed
  * depth-first from the root, each member's own family before the next
  * member's, so ELK places a person's side of the family (parents, their
  * siblings, grandparents) before, and apart from, their spouse's parents.
@@ -132,21 +111,21 @@ export function familyGraph(people: People, rootId: string): ElkNode {
   const householdOf = new Map<string, string>();
   for (const g of groups) for (const id of g) householdOf.set(id, `h:${g[0]}`);
 
-  // Each card in a stack has its own port on top, where the line from its
-  // parents arrives, so a spouse's parents connect to the spouse's card (and
-  // sit on that side). Lines to children leave from each parent's own port at
-  // the bottom, so they come from both the father's and the mother's card.
+  // Each card has its own port on top, where the line from its parents
+  // arrives, so a spouse's parents connect to the spouse's card (and sit on
+  // that side). Lines to children leave from each parent's own port at the
+  // bottom, so they come from both the father's and the mother's card.
   const nodes: ElkNode[] = groups.map((g) => {
     const id = `h:${g[0]}`;
     return {
       id,
-      width: CARD_W + (g.length - 1) * STACK_OFFSET,
+      width: CARD_W + (g.length - 1) * SPOUSE_STEP,
       height: CARD_H,
       layoutOptions: { 'elk.portConstraints': 'FIXED_POS' },
       ports: [
         ...g.map((m, i) => ({
           id: `${id}:${m}`,
-          x: portX(i),
+          x: cardMid(i),
           y: 0,
           width: 0,
           height: 0,
@@ -154,7 +133,7 @@ export function familyGraph(people: People, rootId: string): ElkNode {
         })),
         ...g.map((m, i) => ({
           id: `${id}:down:${m}`,
-          x: downX(i),
+          x: cardMid(i),
           y: CARD_H,
           width: 0,
           height: 0,
@@ -244,7 +223,7 @@ export function roundedPath(points: ElkPoint[], radius = 10): string {
 
 /**
  * Lays out the tree with ELK (loaded on first use, so it is not in the main
- * bundle). Coordinates are moved so the root's front card is centered on (0, 0).
+ * bundle). Coordinates are moved so the root's card is centered on (0, 0).
  */
 export async function layoutTree(people: People, rootId: string): Promise<Layout> {
   const { default: ELK } = await import('elkjs/lib/elk.bundled.js');
@@ -255,13 +234,8 @@ export async function layoutTree(people: People, rootId: string): Promise<Layout
   const rootGroup = [...groups].find(([, g]) => g.includes(rootId))!;
   const rootNode = graph.children!.find((n) => n.id === rootGroup[0])!;
   const at = rootGroup[1].indexOf(rootId);
-  const ox = rootNode.x! + at * STACK_OFFSET + CARD_W / 2;
-  const oy = rootNode.y! - at * STACK_OFFSET + CARD_H / 2;
-  // Lines to and from cards behind the front one stop above and below the
-  // stack; the household draws the rest, to the stacked or fanned-out card.
-  const back = new Set([...groups].flatMap(([id, g]) => g.slice(1).map((m) => `${id}:${m}`)));
-  const backDown = new Set([...groups].flatMap(([id, g]) => g.slice(1).map((m) => `${id}:down:${m}`)));
-  const sources = new Set((graph.edges ?? []).map((e) => e.sources[0]));
+  const ox = rootNode.x! + cardMid(at);
+  const oy = rootNode.y! + CARD_H / 2;
 
   return {
     households: graph
@@ -269,18 +243,17 @@ export async function layoutTree(people: People, rootId: string): Promise<Layout
       .map((node) => {
         const members = groups.get(node.id)!;
         const linked = members.map((m) => isLinked(people, m));
-        const parent = members.map((m) => sources.has(`${node.id}:down:${m}`));
-        return { id: node.id, members, linked, parent, x: node.x! - ox, y: node.y! - oy };
+        return { id: node.id, members, linked, x: node.x! - ox, y: node.y! - oy };
       }),
     lines: (graph.edges ?? []).flatMap((e) =>
       (e.sections ?? []).map((s) => {
-        const start = backDown.has(e.sources[0]) ? { x: s.startPoint.x, y: s.startPoint.y + DROP } : s.startPoint;
-        const end = back.has(e.targets[0]) ? { x: s.endPoint.x, y: s.endPoint.y - DROP } : s.endPoint;
         const from = e.sources[0];
         return {
           id: e.id,
           family: from.startsWith('h:') ? e.targets[0] : from,
-          d: roundedPath([start, ...(s.bendPoints ?? []), end].map((p) => ({ x: p.x - ox, y: p.y - oy }))),
+          d: roundedPath(
+            [s.startPoint, ...(s.bendPoints ?? []), s.endPoint].map((p) => ({ x: p.x - ox, y: p.y - oy })),
+          ),
         };
       }),
     ),

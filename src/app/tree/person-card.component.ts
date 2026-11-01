@@ -216,16 +216,18 @@ export interface AddRequest {
     >
       <ion-icon slot="icon-only" name="add"></ion-icon>
     </ion-button>
-    <ion-button
-      class="add spouse"
-      shape="round"
-      size="small"
-      color="danger"
-      (click)="add.emit({ relation: 'spouse' })"
-      [attr.aria-label]="'Add spouse of ' + person().name"
-    >
-      <ion-icon slot="icon-only" name="heart"></ion-icon>
-    </ion-button>
+    @if (canAddSpouse()) {
+      <ion-button
+        class="add spouse"
+        shape="round"
+        size="small"
+        color="danger"
+        (click)="add.emit({ relation: 'spouse' })"
+        [attr.aria-label]="'Add spouse of ' + person().name"
+      >
+        <ion-icon slot="icon-only" name="heart"></ion-icon>
+      </ion-button>
+    }
   `,
   styles: `
     :host {
@@ -465,6 +467,8 @@ export interface AddRequest {
 export class PersonCardComponent {
   readonly person = input.required<Person>();
   readonly canAddParent = input(true);
+  /** False while married to someone alive (a widow or widower can marry again). */
+  readonly canAddSpouse = input(true);
   readonly edit = output<void>();
   /** The card itself was clicked (not one of its buttons): show the profile. */
   readonly view = output<void>();
