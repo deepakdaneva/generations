@@ -306,8 +306,9 @@ export interface AddRequest {
       align-items: center;
       gap: 6px;
       padding: 8px;
-      background: var(--ion-color-dark);
-      color: var(--ion-color-dark-contrast);
+      /* Dark in both themes (Ionic's "dark" colour turns light in dark mode). */
+      background: #222428;
+      color: #fff;
       font-size: 13px;
     }
     .edit {
@@ -467,7 +468,7 @@ export interface AddRequest {
 export class PersonCardComponent {
   readonly person = input.required<Person>();
   readonly canAddParent = input(true);
-  /** False while married to someone alive (a widow or widower can marry again). */
+  /** False for someone who has died or is married to someone alive (a widow or widower can marry again). */
   readonly canAddSpouse = input(true);
   readonly edit = output<void>();
   /** The card itself was clicked (not one of its buttons): show the profile. */

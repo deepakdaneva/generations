@@ -2,8 +2,9 @@ import {
   addRelative,
   deletePerson,
   hasLivingSpouse,
-  linkSpouse,
-  spouseCandidates,
+  generations,
+  linkCandidates,
+  linkRelative,
   pathTo,
   RelationError,
   reorder,
@@ -144,36 +145,64 @@ describe('marrying again', () => {
     expect(get('me').spouses).toEqual(['first', 'second']);
   });
 
-  it('offers no one married to someone alive', () => {
-    add('me', 'sibling', 'bro');
-    add('me', 'spouse', 'wife');
-    add('wife', 'sibling', 'sis');
-    expect(spouseCandidates(tree, 'bro')).toEqual(['sis']);
-    expect(() => linkSpouse(tree, 'bro', 'wife')).toThrow(/already married/);
+  it('adds no spouse to someone who has died', () => {
+    add('me', 'parent', 'dad');
+    tree.set('dad', { ...get('dad'), death: '2001-02-03' });
+    expect(() => add('dad', 'spouse', 'wife')).toThrow(/has died/);
   });
 });
 
-describe('linkSpouse', () => {
-  it('marries two people already in the tree: two brothers and two sisters', () => {
+describe('linking people already in the tree', () => {
+  /** Two brothers (me, bro) marry two sisters (d1, d2), each added as a new spouse first. */
+  function brothersAndSisters() {
     add('me', 'parent', 'pa');
     add('me', 'sibling', 'bro');
     add('me', 'spouse', 'd1');
     add('d1', 'parent', 'pb');
-    add('d1', 'sibling', 'd2');
-    expect(spouseCandidates(tree, 'bro')).toContain('d2');
-    expect(spouseCandidates(tree, 'bro')).not.toContain('me'); // his brother
-    tree = apply(tree, linkSpouse(tree, 'bro', 'd2'));
-    expect(get('bro').spouses).toEqual(['d2']);
-    expect(get('d2').spouses).toEqual(['bro']);
-    expect(get('d2').parents).toEqual(['pb']);
+    add('bro', 'spouse', 'd2');
+  }
+
+  it('numbers generations from the own card', () => {
+    brothersAndSisters();
+    const gen = generations(tree, 'me');
+    expect([gen.get('pa'), gen.get('pb'), gen.get('d2')]).toEqual([-1, -1, 0]);
   });
 
-  it('refuses close relatives and existing spouses', () => {
+  it("links an existing parent one generation up: the wife's sister gets her father", () => {
+    brothersAndSisters();
+    expect(linkCandidates(tree, 'me', 'd2', 'parent')).toEqual(['pb']); // not her husband's parent
+    tree = apply(tree, linkRelative(tree, 'd2', 'parent', 'pb'));
+    expect(get('d2').parents).toEqual(['pb']);
+    expect(get('pb').children).toEqual(['d1', 'd2']);
+  });
+
+  it('links an existing sibling in the same generation, on the chosen side', () => {
+    brothersAndSisters();
+    expect(linkCandidates(tree, 'me', 'd1', 'sibling')).toEqual(['d2']); // not her husband or his brother's family
+    tree = apply(tree, linkRelative(tree, 'd1', 'sibling', 'd2', { before: true }));
+    expect(get('d2').parents).toEqual(['pb']);
+    expect(get('pb').children).toEqual(['d2', 'd1']);
+  });
+
+  it('links an existing child one generation down, with the other parent', () => {
+    add('me', 'child', 'kid');
+    add('kid', 'spouse', 'kw'); // one generation below, no parents yet
+    add('me', 'sibling', 'bro');
+    add('bro', 'spouse', 'bw');
+    expect(linkCandidates(tree, 'me', 'bro', 'child')).toContain('kw');
+    expect(linkCandidates(tree, 'me', 'bro', 'child')).not.toContain('me');
+    tree = apply(tree, linkRelative(tree, 'bro', 'child', 'kw', { otherParent: 'bw' }));
+    expect(get('kw').parents).toEqual(['bro', 'bw']);
+    expect(get('bw').children).toEqual(['kw']);
+  });
+
+  it('refuses links that make no sense', () => {
     add('me', 'parent', 'dad');
     add('me', 'spouse', 'wife');
-    expect(() => linkSpouse(tree, 'me', 'dad')).toThrow(RelationError);
-    expect(() => linkSpouse(tree, 'me', 'wife')).toThrow(RelationError);
-    expect(() => linkSpouse(tree, 'me', 'me')).toThrow(RelationError);
+    add('me', 'child', 'kid');
+    expect(() => linkRelative(tree, 'me', 'parent', 'me')).toThrow(RelationError);
+    expect(() => linkRelative(tree, 'me', 'parent', 'kid')).toThrow(/can't be a parent/);
+    expect(() => linkRelative(tree, 'me', 'sibling', 'wife')).toThrow(/already related/);
   });
 });
 

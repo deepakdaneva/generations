@@ -530,6 +530,8 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await modal.locator('ion-input[formcontrolname=death] input').fill('1990-04-30');
   await modal.getByRole('button', { name: 'Save' }).click();
   await expect(card('Grandfather').locator('.memorial')).toHaveText(/In loving memory · aged 69/);
+  // Someone who has died gets no new spouse.
+  await expect(page.getByRole('button', { name: 'Add spouse of Grandfather' })).toHaveCount(0);
 
   // Only people at the end of a branch can be deleted: not Father (parents and
   // children), but Grandfather (the top of the line).
@@ -547,7 +549,9 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await expect(card('Father')).toBeVisible();
 });
 
-test('family tree: two brothers marry two sisters already in the tree; crossing lines show a gap', async ({ page }) => {
+test('family tree: two brothers marry two sisters; a parent already in the tree is linked; crossings show a gap', async ({
+  page,
+}) => {
   test.slow(); // many steps; slower CI runners need more than the default 30 s
   await login(page, await freshUser('Sam'));
   const { card, modal, bringIntoView, addRelative, label } = treeHelpers(page);
@@ -555,19 +559,21 @@ test('family tree: two brothers marry two sisters already in the tree; crossing 
   await addRelative('Sam', 'Add sibling right of', 'Brother');
   await addRelative('Sam', 'Add spouse of', 'Dia', 'Female');
   await addRelative('Dia', 'Add parent of', 'Her father');
-  await addRelative('Dia', 'Add sibling right of', 'Dora', 'Female');
+  await addRelative('Brother', 'Add spouse of', 'Dora', 'Female');
 
-  // Brother marries Dora, who is already in the tree.
-  await bringIntoView('Brother');
-  await card('Brother').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
-  await page.getByRole('button', { name: 'Add spouse of Brother' }).click();
+  // Dora is Dia's sister: link her to Dia's father, who is already in the tree
+  // one generation up. The spouse form offers no such choice.
+  await bringIntoView('Dora');
+  await card('Dora').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
+  await page.getByRole('button', { name: 'Add parent of Dora' }).click();
   await modal.locator('ion-segment-button[value=existing]').click();
-  await modal.locator('ion-searchbar input').fill('Do');
-  await modal.getByRole('radio', { name: /Dora/ }).click();
+  await expect(modal.getByRole('radio')).toHaveCount(1); // only Her father: not Brother's (absent) parents, nobody else
+  await modal.locator('ion-searchbar input').fill('Her');
+  await modal.getByRole('radio', { name: /Her father/ }).click();
   await modal.getByRole('button', { name: 'Save' }).click();
   await expect(modal.locator('form, ion-searchbar')).toHaveCount(0);
 
-  // Dora appears beside Brother and keeps her line from her father.
+  // Dora stays beside Brother and gets the line from her father.
   await expect(page.locator('.household', { has: card('Brother') }).locator('app-person-card')).toHaveCount(2);
   await expect(
     page

@@ -21,11 +21,12 @@ import { FIRESTORE } from '../core/firebase';
 import {
   addRelative,
   deletePerson,
-  linkSpouse,
+  linkRelative,
   neighbors,
   reorder,
   unlink,
   type Change,
+  type LinkRelation,
   type Relation,
 } from './relations';
 
@@ -274,10 +275,15 @@ export class TreeService {
     await this.loadMore(parents.flatMap((p) => this.people().get(p)?.children ?? []));
   }
 
-  /** Marries two people already in the tree. */
-  async linkSpouse(a: string, b: string): Promise<void> {
+  /** Links `ofId` to someone already in the tree as their parent, sibling or child. */
+  async linkRelative(
+    ofId: string,
+    relation: LinkRelation,
+    otherId: string,
+    opts: { before?: boolean; otherParent?: string } = {},
+  ): Promise<void> {
     await this.loadAll();
-    await this.commit(linkSpouse(this.people(), a, b));
+    await this.commit(linkRelative(this.people(), ofId, relation, otherId, opts));
   }
 
   async unlink(a: string, b: string): Promise<void> {
