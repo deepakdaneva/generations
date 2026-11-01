@@ -161,6 +161,27 @@ avoid a light flash. The preference is deliberately per device (maintainer
 decision); syncing it per account would need a Firestore field and a rules
 change.
 
+### D13. Family-tree layout with ELK (elkjs)
+
+Family trees are not trees: people have two parents, spouses, and families
+that join. Laying them out neatly is a graph-layout problem, so the canvas
+uses [elkjs](https://github.com/kieler/elkjs) (Eclipse Layout Kernel,
+actively maintained, EPL-2.0 OR GPL-3.0; approved by the maintainer) instead
+of a home-made algorithm. It is the only new runtime dependency.
+
+- A person and their spouses form one node (a stack of cards). Each set of
+  parents gets a 1x1 "family" node: the parents' line drops into it and the
+  children's lines leave from it, which draws the classic family-tree bus.
+  Siblings without known parents hang from a family node of their own.
+- ELK's layered algorithm (top to bottom, orthogonal edges) places the nodes;
+  the app draws the edges as SVG paths with rounded corners under the cards.
+- Cards have a fixed size, so the layout never waits for rendering. Only the
+  front card counts toward a stack's height, so rows stay aligned.
+- ELK is loaded on first use (a lazy chunk of about 340 kB compressed), so it
+  is not in the main bundle. It runs on the main thread; its web worker is the
+  upgrade path if large trees ever stutter.
+- Pan and zoom are plain pointer events and a CSS transform, with no library.
+
 ### D7. Local development on the Emulator Suite
 
 `npm run dev` runs `firebase emulators:exec`, which starts the Auth and
@@ -211,6 +232,85 @@ users/{uid}
   photo?:      string   (256x256 WebP/JPEG data URL, at most 70,000 characters)
 ```
 
+```text
+trees/{uid}/people/{personId}   one document per person; the user's own card has personId == uid
+  name:          string (1-100 characters)
+  gender?:       "male" | "female" | "other"
+  birth?, death?, anniversary?:  "YYYY-MM-DD"
+  email?:        string (≤ 254)
+  address?:      string (≤ 500)
+  socials?:      { label, value }[] (≤ 10)
+  parents?:      personId[] (≤ 2)   relationship links, kept on both people
+  children?:     personId[]          in sibling order (left to right)
+  spouses?:      personId[]
+  siblings?:     personId[]          only for siblings without known parents:
+                                     the whole group in order, including self
+  photos?:       number[] (≤ 5)      photo slots 0-4 in display order
+  updatedAt:     timestamp (server time)
+
+trees/{uid}                     tree settings
+  rememberView:  boolean            "Remember last position" (off when the document is missing)
+  view?:         { focus, path, dx, dy, z }   saved position, only while rememberView is on
+  updatedAt:     timestamp (server time)
+
+trees/{uid}/photos/{personId}_{slot}   slot 0-4, so at most 5 photos per person
+  data:          string   (WebP/JPEG data URL, at most 100,000 characters)
+  updatedAt:     timestamp (server time)
+```
+
+Photos follow D11: `toPhotoDataUrl()` in `src/app/core/avatar.ts` keeps the
+whole picture, scales the longest side to 480 px (faces stay clearly
+recognizable) and compresses it to the lowest quality step that fits, usually
+10-40 KB. Each photo is its own document, so a card reads only the photo on
+screen (one read), and the 1 MiB document limit is never near. Adding or
+removing a photo updates the person's `photos` list in the same batch write;
+deleting a person deletes their photos too. At five 40 KB photos per person
+the free 1 GiB holds roughly 5,000 fully photographed people.
+
+**Loading.** The canvas never reads the whole tree up front
+(`src/app/tree/tree.service.ts`):
+
+- On opening, it reads the user's own card and then the nearest relatives,
+  breadth-first, until 10 people are loaded (one `in` query per generation,
+  at most 30 ids each; Firestore bills one read per document).
+- Relatives linked from loaded people but not loaded yet become placeholders
+  in the layout (`withPlaceholders()` in `layout.ts`), so ELK keeps their place
+  and the canvas shows a skeleton card there. Whenever the view moves, the
+  placeholders on screen or within one screen of it are loaded (150 ms after
+  the movement stops); new cards fade in over their placeholder.
+- Adding a relative first loads the person's direct relatives, because the
+  change rewrites them too. Removing a relationship or deleting a person
+  first loads the whole tree once per session, because only the whole tree
+  shows who would be cut off.
+- Links to documents that no longer exist (deleted on another device) are
+  hidden instead of being retried.
+
+**Remember last position.** Canvas coordinates depend on what is loaded and
+screen positions on the screen size, so the app saves the position relative
+to a person instead: `focus` is the person whose card is nearest the middle
+of the screen, `dx`/`dy` the middle's offset from that card (in canvas units)
+and `z` the zoom. `path` is the shortest chain of ids from the user's own
+card to `focus`; the next visit loads it with one query, so the layout
+contains the saved person even with lazy loading. The view is saved 2 s after
+it stops moving, when leaving the page and on `pagehide`, and only when it
+changed, which keeps writes low. Turning the setting off rewrites the
+document without `view`. If the saved person no longer exists, the canvas
+opens on the user's own card.
+
+Relationship changes (`src/app/tree/relations.ts`) are pure functions that
+return every person to rewrite; the app saves them in one batch write, so
+both sides of a link always change together. The tree stays connected to the
+user's own card: removing a relationship that is someone's only connection
+is refused, and deleting a person also deletes whoever was only connected
+through them (the user sees the names first). Siblings without parents keep
+a shared `siblings` list; adding a parent to one of them makes the parent
+everyone's, and deleting the only parent of several children turns them into
+such a group.
+
+The family tree is stored as plaintext for now. A later step encrypts each
+person in the browser before it is written, so the database only holds
+ciphertext.
+
 ### Security rules (`firestore.rules`)
 
 - All access requires a signed-in user with `email_verified == true`.
@@ -226,6 +326,12 @@ users/{uid}
   never their own role or status (so an admin cannot lock themselves out).
 - Profiles are never deleted: the Auth account would remain and could recreate
   its profile. Deactivate instead.
+- Family tree: only the owner, while active, can read and write their tree
+  settings (`trees/{uid}`: `rememberView`, a bounded `view`) and read, create,
+  update and delete people in `trees/{uid}/people` and photos in `trees/{uid}/photos`
+  (ids `{personId}_{0-4}`, small JPEG/WebP data URLs only). Admins cannot read other users'
+  trees. Writes must match the shape above, and `updatedAt` must be the
+  server time.
 - Every other path is denied.
 
 `tests/rules/firestore.rules.spec.ts` covers these cases against the Firestore

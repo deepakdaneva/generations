@@ -28,6 +28,12 @@ export const routes: Routes = [
     loadComponent: () => import('./profile/profile.page').then((m) => m.ProfilePage),
   },
   {
+    path: 'settings',
+    title: 'Settings · Generations',
+    canActivate: [authGuard],
+    loadComponent: () => import('./settings/settings.page').then((m) => m.SettingsPage),
+  },
+  {
     path: 'users',
     title: 'User Management · Generations',
     canActivate: [adminGuard],

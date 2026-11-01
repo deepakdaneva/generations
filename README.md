@@ -11,7 +11,7 @@ web, iOS and Android, and is designed to grow into dedicated native apps later.
 ## Objectives
 
 - A simple, welcoming way to record family members and how they are related.
-- An interactive family-tree canvas (planned for a later iteration).
+- An interactive family-tree canvas (being built step by step).
 - Runs entirely on Firebase, within the free **Spark** plan, with no separate
   backend server.
 - Open source, easy to self-host, and cheap to maintain.
@@ -55,12 +55,33 @@ reasoning behind these choices.
   link (max 2 per day per device; also applies to "Forgot password?").
   Your picture appears on the profile button, in the profile menu and in the
   Users list.
-- **Settings** (profile button → Settings): theme choice of System default,
-  Light or Dark. Saved per device; System default follows the OS live.
+- **Settings page** (profile button → Settings):
+  - Theme: System default, Light or Dark. Saved per device; System default
+    follows the OS live.
+  - Remember last position (off by default, saved per account): the family
+    tree reopens where you left it, also after signing out and in or on
+    another device. When off, it always opens on your own card.
 - **About** (profile button → About, or the version link on the sign-in page):
   version, commit, deployment time, environment, source code, issues, security
   policy, license and copyright. Public, no sign-in needed.
-- Home page with a placeholder canvas for the future family tree.
+- **Family tree (in progress):** the home page is a canvas centered on your
+  own card. Drag (mouse or finger) or use the arrow keys to move; scroll, pinch
+  or use the +/- buttons to zoom; the target button re-centers.
+  - Hover or tap a card for its buttons: **+** on top adds a parent, left and
+    right add a sibling on that side, bottom adds a child, the heart adds a
+    spouse. Lines connect parents to their children.
+  - Spouses are stacked behind the card and fan out on hover or tap.
+  - The pencil edits name, dates of birth, death and anniversary, gender,
+    email, place/address and up to 10 social links. It also lists the
+    person's relationships to remove one, and deletes the person (anyone
+    only connected through them is deleted too, after a warning).
+  - Up to 5 photos per person: "+ add" on the photo circle, arrows to browse,
+    the bin to remove. Photos are shrunk in the browser (longest side 480 px,
+    about 10-40 KB each) before they are saved.
+  - Large trees open fast: only your card and the 10 nearest people load
+    first. Relatives further away show as placeholder cards and load in the
+    background as you pan or zoom towards them.
+  - Encryption follows in a later step.
 - **Installable app (PWA):** add it to the home screen on Android, iOS or
   desktop; it opens full screen, starts offline, and offers a reload when a new
   version is deployed.
@@ -82,9 +103,11 @@ reasoning behind these choices.
 │   │   ├── about/          About page (version, commit, links, license)
 │   │   ├── auth/           Sign-in and registration pages
 │   │   ├── core/           Firebase setup, AuthService, route guards
-│   │   ├── home/           Home page (family-tree canvas placeholder)
+│   │   ├── home/           Home page (family-tree canvas: pan, zoom)
 │   │   ├── profile/        Profile page (name, picture, password reset link)
+│   │   ├── settings/       Settings page (theme, remember last position)
 │   │   ├── shared/         Floating menu and profile buttons (no header bar)
+│   │   ├── tree/           Family-tree data service, person card, edit form
 │   │   └── users/          User Management page (admins)
 │   ├── assets/             Static assets
 │   ├── environments/       Local vs deployed build settings

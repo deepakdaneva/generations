@@ -87,6 +87,80 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Family tree: each user owns one tree, trees/{uid}/people/{personId}; their
+    // own card has personId == uid. Only the owner (active) can use it.
+    // ponytail: plaintext for now; browser-side encryption replaces these
+    // fields with one encrypted blob in a later step.
+    function optText(data, key, max) {
+      return !(key in data) || (data[key] is string && data[key].size() <= max);
+    }
+
+    function optDate(data, key) {
+      return !(key in data) || (data[key] is string && data[key].matches('[0-9]{4}-[0-9]{2}-[0-9]{2}'));
+    }
+
+    function optIds(data, key, max) {
+      return !(key in data) || (data[key] is list && data[key].size() <= max);
+    }
+
+    function validPerson(data) {
+      return data.keys().hasOnly(['name', 'gender', 'birth', 'death', 'anniversary', 'email', 'address',
+          'socials', 'parents', 'children', 'spouses', 'siblings', 'photos', 'updatedAt'])
+        && validName(data.name)
+        && (!('gender' in data) || data.gender in ['male', 'female', 'other'])
+        && optDate(data, 'birth') && optDate(data, 'death') && optDate(data, 'anniversary')
+        && optText(data, 'email', 254) && optText(data, 'address', 500)
+        && (!('socials' in data) || (data.socials is list && data.socials.size() <= 10))
+        && optIds(data, 'parents', 2) && optIds(data, 'children', 50)
+        && optIds(data, 'spouses', 10) && optIds(data, 'siblings', 50)
+        && optIds(data, 'photos', 5)
+        && data.updatedAt == request.time;
+    }
+
+    // Tree settings: "remember last position" and the saved position (the person
+    // near the middle of the screen, the chain of ids to load them from the
+    // user's own card, the offset from their card and the zoom).
+    function validView(v) {
+      return v is map
+        && v.keys().hasOnly(['focus', 'path', 'dx', 'dy', 'z'])
+        && v.focus is string
+        && v.path is list && v.path.size() <= 100
+        && v.dx is number && v.dy is number
+        && v.z is number && v.z > 0 && v.z <= 4;
+    }
+
+    match /trees/{ownerId} {
+      allow read, delete: if isActive() && request.auth.uid == ownerId;
+      allow create, update: if isActive() && request.auth.uid == ownerId
+        && request.resource.data.keys().hasOnly(['rememberView', 'view', 'updatedAt'])
+        && request.resource.data.rememberView is bool
+        && (!('view' in request.resource.data) || validView(request.resource.data.view))
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    match /trees/{ownerId}/people/{personId} {
+      allow read, delete: if isActive() && request.auth.uid == ownerId;
+      allow create, update: if isActive() && request.auth.uid == ownerId && validPerson(request.resource.data);
+    }
+
+    // Up to 5 photos per person: the id is "{personId}_{0-4}", so there are only
+    // five possible documents. Each is a small WebP/JPEG data URL (the app
+    // sends 480 px images of ~20-40 KB; Cloud Storage needs the paid plan).
+    function validTreePhoto(data) {
+      return data.keys().hasOnly(['data', 'updatedAt'])
+        && data.data is string
+        && data.data.size() <= 100000
+        && data.data.matches('data:image/(jpeg|webp);base64,[A-Za-z0-9+/=]+')
+        && data.updatedAt == request.time;
+    }
+
+    match /trees/{ownerId}/photos/{photoId} {
+      allow read, delete: if isActive() && request.auth.uid == ownerId;
+      allow create, update: if isActive() && request.auth.uid == ownerId
+        && photoId.matches('[A-Za-z0-9]+_[0-4]')
+        && validTreePhoto(request.resource.data);
+    }
+
     // Everything else is denied until a feature defines its own rules.
     match /{document=**} {
       allow read, write: if false;

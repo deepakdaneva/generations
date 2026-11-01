@@ -33,6 +33,7 @@
     "@angular/service-worker": "22.2.3",
     "@capacitor/core": "8.6.0",
     "@ionic/angular": "^9.0.0",
+    "elkjs": "0.12.0",
     "firebase": "13.1.0",
     "ionicons": "^8.1.0",
     "rxjs": "~7.8.0",

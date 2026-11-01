@@ -3,27 +3,18 @@ import { Router } from '@angular/router';
 import {
   IonAvatar,
   IonButton,
-  IonButtons,
   IonContent,
-  IonHeader,
   IonIcon,
   IonItem,
   IonLabel,
   IonList,
-  IonListHeader,
   IonMenuButton,
-  IonModal,
   IonPopover,
-  IonRadio,
-  IonRadioGroup,
-  IonTitle,
-  IonToolbar,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { informationCircleOutline, logOutOutline, personCircle, settingsOutline } from 'ionicons/icons';
 
 import { AuthService } from '../core/auth.service';
-import { ThemeService, type ThemeMode } from '../core/theme';
 
 /**
  * Header-less page chrome: a floating menu button (only shown to admins, via the
@@ -79,31 +70,6 @@ import { ThemeService, type ThemeMode } from '../core/theme';
         </ion-content>
       </ng-template>
     </ion-popover>
-
-    <ion-modal [isOpen]="settingsOpen()" (didDismiss)="settingsOpen.set(false)">
-      <ng-template>
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Settings</ion-title>
-            <ion-buttons slot="end">
-              <ion-button (click)="settingsOpen.set(false)">Close</ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content>
-          <ion-list>
-            <ion-list-header><ion-label>Theme</ion-label></ion-list-header>
-            <ion-radio-group [value]="theme.mode()" (ionChange)="theme.setMode($event.detail.value)">
-              @for (option of themes; track option.value) {
-                <ion-item>
-                  <ion-radio [value]="option.value">{{ option.label }}</ion-radio>
-                </ion-item>
-              }
-            </ion-radio-group>
-          </ion-list>
-        </ion-content>
-      </ng-template>
-    </ion-modal>
   `,
   styles: `
     :host {
@@ -137,40 +103,14 @@ import { ThemeService, type ThemeMode } from '../core/theme';
       margin-left: auto;
     }
   `,
-  imports: [
-    IonAvatar,
-    IonButton,
-    IonButtons,
-    IonContent,
-    IonHeader,
-    IonIcon,
-    IonItem,
-    IonLabel,
-    IonList,
-    IonListHeader,
-    IonMenuButton,
-    IonModal,
-    IonPopover,
-    IonRadio,
-    IonRadioGroup,
-    IonTitle,
-    IonToolbar,
-  ],
+  imports: [IonAvatar, IonButton, IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenuButton, IonPopover],
 })
 export class TopActionsComponent {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
-  protected readonly theme = inject(ThemeService);
-  protected readonly themes: { value: ThemeMode; label: string }[] = [
-    { value: 'system', label: 'System default' },
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
-  ];
-
   protected readonly profileOpen = signal(false);
   private readonly profilePopover = viewChild.required<IonPopover>('profilePopover');
-  protected readonly settingsOpen = signal(false);
   protected profileEvent?: Event;
 
   constructor() {
@@ -193,9 +133,9 @@ export class TopActionsComponent {
     await this.router.navigateByUrl('/about');
   }
 
-  openSettings(): void {
-    this.profileOpen.set(false);
-    this.settingsOpen.set(true);
+  async openSettings(): Promise<void> {
+    await this.profilePopover().dismiss();
+    await this.router.navigateByUrl('/settings');
   }
 
   async logout(): Promise<void> {

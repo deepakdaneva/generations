@@ -134,6 +134,73 @@ describe('own profile: name and picture', () => {
     assertFails(updateDoc(doc(db('admin'), 'users/alice'), { photo })));
 });
 
+describe('family tree', () => {
+  const person = (extra: Record<string, unknown> = {}) => ({
+    name: 'Alice',
+    birth: '1990-04-01',
+    gender: 'female',
+    parents: [],
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+
+  it('lets an active user create, read, update and delete people in their own tree', async () => {
+    const ref = doc(db('alice'), 'trees/alice/people/alice');
+    await assertSucceeds(setDoc(ref, person()));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(getDocs(collection(db('alice'), 'trees/alice/people')));
+    await assertSucceeds(updateDoc(ref, { name: 'Alice B', updatedAt: serverTimestamp() }));
+    await assertSucceeds(deleteDoc(ref));
+  });
+  it("blocks reading or writing someone else's tree, even for admins", async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'trees/alice/people/p1'), { name: 'X' }));
+    await assertFails(getDoc(doc(db('admin'), 'trees/alice/people/p1')));
+    await assertFails(setDoc(doc(db('admin'), 'trees/alice/people/p2'), person()));
+    await assertFails(deleteDoc(doc(db('admin'), 'trees/alice/people/p1')));
+  });
+  it('blocks deactivated and unverified users', async () => {
+    await assertFails(setDoc(doc(db('off'), 'trees/off/people/off'), person()));
+    await assertFails(getDoc(doc(db('alice', false), 'trees/alice/people/alice')));
+  });
+  it('lets the owner store up to 5 small photos per person, and nothing else', async () => {
+    const photo = (data = 'data:image/webp;base64,' + 'A'.repeat(40000)) => ({ data, updatedAt: serverTimestamp() });
+    await assertSucceeds(setDoc(doc(db('alice'), 'trees/alice/photos/p1_0'), photo()));
+    await assertSucceeds(setDoc(doc(db('alice'), 'trees/alice/photos/p1_4'), photo()));
+    await assertSucceeds(getDoc(doc(db('alice'), 'trees/alice/photos/p1_4')));
+    await assertSucceeds(deleteDoc(doc(db('alice'), 'trees/alice/photos/p1_4')));
+    await assertFails(setDoc(doc(db('alice'), 'trees/alice/photos/p1_5'), photo()));
+    await assertFails(setDoc(doc(db('alice'), 'trees/alice/photos/p1'), photo()));
+    await assertFails(
+      setDoc(doc(db('alice'), 'trees/alice/photos/p1_0'), photo('data:image/webp;base64,' + 'A'.repeat(100000))),
+    );
+    await assertFails(setDoc(doc(db('alice'), 'trees/alice/photos/p1_0'), photo('https://example.com/a.png')));
+    await assertFails(getDoc(doc(db('admin'), 'trees/alice/photos/p1_0')));
+    await assertFails(setDoc(doc(db('admin'), 'trees/alice/photos/p1_1'), photo()));
+  });
+  it('lets the owner keep their tree settings and saved position', async () => {
+    const ref = doc(db('alice'), 'trees/alice');
+    const view = { focus: 'p1', path: ['alice', 'p1'], dx: 10, dy: -20.5, z: 0.8 };
+    await assertSucceeds(setDoc(ref, { rememberView: true, view, updatedAt: serverTimestamp() }));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(setDoc(ref, { rememberView: false, updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { rememberView: 'yes', updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { rememberView: true, view: { ...view, z: 50 }, updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { rememberView: true, other: 1, updatedAt: serverTimestamp() }));
+    await assertFails(getDoc(doc(db('admin'), 'trees/alice')));
+    await assertFails(setDoc(doc(db('admin'), 'trees/alice'), { rememberView: true, updatedAt: serverTimestamp() }));
+  });
+  it('blocks invalid people', async () => {
+    const ref = doc(db('alice'), 'trees/alice/people/p1');
+    await assertFails(setDoc(ref, person({ name: '' })));
+    await assertFails(setDoc(ref, person({ gender: 'robot' })));
+    await assertFails(setDoc(ref, person({ birth: '1 April 1990' })));
+    await assertFails(setDoc(ref, person({ parents: ['a', 'b', 'c'] })));
+    await assertFails(setDoc(ref, person({ photos: [0, 1, 2, 3, 4, 0] })));
+    await assertFails(setDoc(ref, person({ extra: true })));
+    await assertFails(setDoc(ref, person({ updatedAt: new Date(0) })));
+  });
+});
+
 describe('other collections', () => {
   it('denies everything else', () => assertFails(getDoc(doc(db('admin'), 'anything/else'))));
 });
