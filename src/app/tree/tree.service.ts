@@ -18,7 +18,7 @@ import { AuthService } from '../core/auth.service';
 import { AvatarError, toPhotoDataUrl } from '../core/avatar';
 import { FIRESTORE } from '../core/firebase';
 
-import { addRelative, deletePerson, neighbors, unlink, type Change, type Relation } from './relations';
+import { addRelative, deletePerson, neighbors, reorder, unlink, type Change, type Relation } from './relations';
 
 export type Gender = 'male' | 'female' | 'other';
 
@@ -223,13 +223,21 @@ export class TreeService {
     this.people.set(next);
   }
 
-  /** Replaces a person's details, keeping their relationships. */
-  save(id: string, details: PersonDetails): Promise<void> {
-    const old = this.people().get(id);
-    if (!old) throw new Error('Unknown person');
+  /** Replaces a person's details, keeping their relationships; `position` also moves them in the birth order. */
+  async save(id: string, details: PersonDetails, position?: number): Promise<void> {
+    if (!this.people().get(id)) throw new Error('Unknown person');
+    let change: Change = { write: [], remove: [] };
+    if (position !== undefined) {
+      await this.loadFamily(id);
+      change = reorder(this.people(), id, position);
+    }
+    const old = change.write.find((p) => p.id === id) ?? this.people().get(id)!;
     const { parents, children, spouses, siblings, photos } = old;
-    return this.commit({
-      write: [{ id, ...cleanDetails(details), parents, children, spouses, siblings, photos }],
+    await this.commit({
+      write: [
+        ...change.write.filter((p) => p.id !== id),
+        { id, ...cleanDetails(details), parents, children, spouses, siblings, photos },
+      ],
       remove: [],
     });
   }
@@ -262,7 +270,7 @@ export class TreeService {
     await this.commit(unlink(this.people(), this.uid, a, b));
   }
 
-  /** What deleting `id` would remove (the person plus anyone only connected through them). */
+  /** Checks that `id` can be deleted (see deletePerson); throws a RelationError explaining why not. */
   async planDelete(id: string): Promise<Change> {
     await this.loadAll();
     return deletePerson(this.people(), this.uid, id);

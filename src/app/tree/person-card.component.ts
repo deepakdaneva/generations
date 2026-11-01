@@ -26,11 +26,24 @@ import {
   trashOutline,
 } from 'ionicons/icons';
 
+import { AuthService } from '../core/auth.service';
 import { AvatarError } from '../core/avatar';
 
 import { CARD_H, CARD_W } from './layout';
 import type { Relation } from './relations';
 import { MAX_PHOTOS, TreeService, type Person } from './tree.service';
+
+/** Awareness-style mourning ribbon (Ionicons has none). */
+const RIBBON =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" ' +
+  'stroke-width="2" stroke-linecap="round" d="M12 3c-2 0-3.5 1.6-3.5 3.6 0 2.4 2 5 6.5 12.4M12 3c2 0 3.5 1.6 3.5 3.6 0 2.4-2 5-6.5 12.4"/></svg>';
+
+/** Whole years between two YYYY-MM-DD dates, or null when one is missing. */
+export function yearsBetween(from?: string, to?: string): number | null {
+  if (!from || !to) return null;
+  const years = Number(to.slice(0, 4)) - Number(from.slice(0, 4));
+  return to.slice(5) < from.slice(5) ? years - 1 : years;
+}
 
 export interface AddRequest {
   relation: Relation;
@@ -44,7 +57,19 @@ export interface AddRequest {
   imports: [DatePipe, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon, IonSpinner],
   host: { '[style.width.px]': 'width', '[style.height.px]': 'height' },
   template: `
-    <ion-card class="person" [class.male]="person().gender === 'male'" [class.female]="person().gender === 'female'">
+    <ion-card
+      class="person"
+      [class.male]="person().gender === 'male'"
+      [class.female]="person().gender === 'female'"
+      [class.deceased]="!!person().death"
+      tabindex="0"
+      [attr.aria-label]="'Open profile of ' + person().name"
+      (click)="openProfile($event)"
+      (keydown.enter)="openProfile($event)"
+    >
+      @if (person().death) {
+        <ion-icon class="ribbon" [src]="ribbon" aria-label="Deceased"></ion-icon>
+      }
       <ion-button
         class="edit"
         fill="clear"
@@ -62,6 +87,8 @@ export interface AddRequest {
           } @else {
             <ion-spinner name="dots" aria-label="Loading photo"></ion-spinner>
           }
+        } @else if (profilePhoto(); as url) {
+          <img [src]="url" [alt]="'Profile picture of ' + person().name" draggable="false" />
         } @else {
           <span aria-hidden="true">{{ initials() }}</span>
         }
@@ -143,6 +170,12 @@ export interface AddRequest {
           }
         </ul>
       </ion-card-content>
+      @if (person().death) {
+        <div class="memorial">
+          <ion-icon [src]="ribbon" aria-hidden="true"></ion-icon>
+          In loving memory{{ ageAtDeath() === null ? '' : ' · aged ' + ageAtDeath() }}
+        </div>
+      }
     </ion-card>
 
     @if (canAddParent()) {
@@ -209,7 +242,7 @@ export interface AddRequest {
       position: relative;
       height: 100%;
       margin: 0;
-      cursor: default;
+      cursor: pointer;
       border-radius: 16px;
       text-align: center;
       /* Layered shadow: a tight contact shadow plus a soft, wide one reads as depth. */
@@ -248,6 +281,32 @@ export interface AddRequest {
         transition: none;
         transform: none;
       }
+    }
+    /* Deceased: mourning ribbon, black-and-white photo, dark footer. */
+    .ribbon {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+      font-size: 22px;
+    }
+    .deceased .photo {
+      filter: grayscale(1);
+      box-shadow: 0 0 0 3px var(--ion-color-medium);
+    }
+    .memorial {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      padding: 8px;
+      background: var(--ion-color-dark);
+      color: var(--ion-color-dark-contrast);
+      font-size: 13px;
     }
     .edit {
       position: absolute;
@@ -407,11 +466,15 @@ export class PersonCardComponent {
   readonly person = input.required<Person>();
   readonly canAddParent = input(true);
   readonly edit = output<void>();
+  /** The card itself was clicked (not one of its buttons): show the profile. */
+  readonly view = output<void>();
   readonly add = output<AddRequest>();
 
   protected readonly width = CARD_W;
   protected readonly height = CARD_H;
   protected readonly genders = { male: 'Male', female: 'Female', other: 'Other' };
+  protected readonly ribbon = RIBBON;
+  protected readonly ageAtDeath = computed(() => yearsBetween(this.person().birth, this.person().death));
   protected readonly initials = computed(() =>
     this.person()
       .name.split(/\s+/)
@@ -421,6 +484,12 @@ export class PersonCardComponent {
   );
 
   private readonly tree = inject(TreeService);
+  private readonly auth = inject(AuthService);
+  /** The user's own card without tree photos shows their profile picture. */
+  protected readonly profilePhoto = computed(() => {
+    const profile = this.auth.profile();
+    return profile?.id === this.person().id ? (profile.photo ?? null) : null;
+  });
   private readonly toasts = inject(ToastController);
   protected readonly maxPhotos = MAX_PHOTOS;
   protected readonly busy = signal(false);
@@ -456,6 +525,11 @@ export class PersonCardComponent {
       const slot = this.slot();
       if (slot !== undefined) void this.tree.loadPhoto(this.person().id, slot);
     });
+  }
+
+  protected openProfile(e: Event): void {
+    if ((e.target as Element).closest('ion-button, input')) return;
+    this.view.emit();
   }
 
   protected step(by: number): void {

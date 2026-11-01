@@ -3,6 +3,7 @@ import {
   deletePerson,
   pathTo,
   RelationError,
+  reorder,
   unlink,
   type Change,
   type People,
@@ -96,18 +97,27 @@ describe('unlink', () => {
 });
 
 describe('deletePerson', () => {
-  it('also deletes people only connected through them', () => {
-    add('me', 'parent', 'dad');
-    add('dad', 'parent', 'grandpa');
+  it('deletes a person at the end of a branch', () => {
     add('me', 'spouse', 'wife');
-    const change = deletePerson(tree, 'me', 'dad');
-    expect(change.remove.sort()).toEqual(['dad', 'grandpa']);
-    tree = apply(tree, change);
-    expect(get('me').parents).toBeUndefined();
-    expect(get('wife').spouses).toEqual(['me']);
+    add('me', 'child', 'kid');
+    tree = apply(tree, deletePerson(tree, 'me', 'kid'));
+    expect(tree.has('kid')).toBe(false);
+    expect(get('me').children).toBeUndefined();
   });
 
-  it('keeps children of a deleted parent together as siblings', () => {
+  it('refuses people with both parents and children', () => {
+    add('me', 'parent', 'dad');
+    add('dad', 'parent', 'grandpa');
+    expect(() => deletePerson(tree, 'me', 'dad')).toThrow(/end of a branch/);
+  });
+
+  it('refuses when someone would be cut off', () => {
+    add('me', 'spouse', 'wife');
+    add('wife', 'parent', 'inlaw');
+    expect(() => deletePerson(tree, 'me', 'wife')).toThrow(/cut off 1 person/);
+  });
+
+  it('deletes a top-most ancestor; their children stay together as siblings', () => {
     add('me', 'parent', 'dad');
     add('me', 'sibling', 'sis');
     tree = apply(tree, deletePerson(tree, 'me', 'dad'));
@@ -117,6 +127,27 @@ describe('deletePerson', () => {
 
   it("refuses to delete the user's own card", () => {
     expect(() => deletePerson(tree, 'me', 'me')).toThrow(RelationError);
+  });
+});
+
+describe('reorder', () => {
+  it('moves a child in the birth order of both parents', () => {
+    add('me', 'parent', 'dad');
+    add('me', 'parent', 'mum');
+    add('me', 'sibling', 'b');
+    add('b', 'sibling', 'c');
+    tree = apply(tree, reorder(tree, 'c', 0));
+    expect(get('dad').children).toEqual(['c', 'me', 'b']);
+    expect(get('mum').children).toEqual(['c', 'me', 'b']);
+    tree = apply(tree, reorder(tree, 'c', 2));
+    expect(get('dad').children).toEqual(['me', 'b', 'c']);
+  });
+
+  it('moves a sibling without parents in the shared group', () => {
+    add('me', 'sibling', 'b');
+    tree = apply(tree, reorder(tree, 'b', 0));
+    expect(get('me').siblings).toEqual(['b', 'me']);
+    expect(get('b').siblings).toEqual(['b', 'me']);
   });
 });
 

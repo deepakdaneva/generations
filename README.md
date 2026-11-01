@@ -55,7 +55,7 @@ reasoning behind these choices.
   link (max 2 per day per device; also applies to "Forgot password?").
   Your picture appears on the profile button, in the profile menu and in the
   Users list.
-- **Notifications** (bell next to the profile button): admins are notified
+- **Notifications** (bell left of the profile button): admins are notified
   when someone registers or signs in with Google for the first time. The
   badge counts requests that are still waiting and that you have not opened.
   Opening one shows the account with **Approve** and **Reject**; once any
@@ -82,13 +82,26 @@ reasoning behind these choices.
     or child; brother, sister or sibling for siblings without known parents).
   - Cards of men have a light blue tint, cards of women a light pink one.
     Gender is required when adding or editing a person.
-  - Spouses are stacked behind the card and fan out on hover or tap; a
-    spouse's parents connect to the spouse's own card and are placed on the
-    spouse's side, outside the other partner's family.
+  - Spouses are stacked behind the card, the man's card in front, and fan
+    out on hover or tap; a spouse's parents connect to the spouse's own card
+    and are placed on the spouse's side, outside the other partner's family.
+    Fanned out, a line with a beating heart joins the married couple.
+  - A person with a date of death gets a mourning ribbon, a black-and-white
+    photo and an "In loving memory · aged N" footer.
+  - Your own card shows your profile picture until the card has photos of
+    its own.
+  - Lines to children come from both parents' cards; in a stack, the line
+    from the card behind leaves from its visible edge (and from the card
+    itself once the stack fans out).
+  - Clicking a card (on touch: tapping a card of an open stack) opens the
+    person's profile: photos, life dates, family (tap a relative to open
+    theirs) and contact details, with an edit button.
   - The pencil edits name, dates of birth, death and anniversary, gender,
-    email, place/address and up to 10 social links. It also lists the
-    person's relationships to remove one, and deletes the person (anyone
-    only connected through them is deleted too, after a warning).
+    birth order among siblings, email, place/address and up to 10 social
+    links. It also lists the person's relationships to remove one, and
+    deletes the person. Only people at the end of a branch can be deleted:
+    not someone with both parents and children, and not when anyone else
+    would lose their connection to your card.
   - Up to 5 photos per person: "+ add" on the photo circle, arrows to browse,
     the bin to remove. Photos are shrunk in the browser (longest side 480 px,
     about 10-40 KB each) before they are saved.

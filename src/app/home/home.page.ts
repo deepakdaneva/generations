@@ -21,14 +21,16 @@ import {
   ToastController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { add, locateOutline, remove } from 'ionicons/icons';
+import { add, heart, locateOutline, remove } from 'ionicons/icons';
 
 import { TopActionsComponent } from '../shared/top-actions.component';
 import {
   CARD_H,
   CARD_W,
   DROP,
+  downX,
   layoutTree,
+  portX,
   SPREAD_STEP,
   STACK_OFFSET,
   withPlaceholders,
@@ -37,11 +39,14 @@ import {
 } from '../tree/layout';
 import { PersonCardComponent, type AddRequest } from '../tree/person-card.component';
 import { PersonEditComponent, type PersonForm } from '../tree/person-edit.component';
-import { childrenOf, neighbors, pathTo, RelationError, siblingsOf } from '../tree/relations';
+import { PersonProfileComponent } from '../tree/person-profile.component';
+import { childrenOf, pathTo, RelationError, siblingsOf } from '../tree/relations';
 import { TreeService, type Person, type SavedView } from '../tree/tree.service';
 import { zoomAt, type View } from '../tree/view';
 
 type Point = { x: number; y: number };
+/** Height of the marriage line and heart between fanned-out spouse cards: the middle of the photo. */
+const HEART_Y = 82;
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
@@ -72,6 +77,7 @@ interface Form {
     IonText,
     PersonCardComponent,
     PersonEditComponent,
+    PersonProfileComponent,
     TopActionsComponent,
   ],
 })
@@ -90,12 +96,16 @@ export class HomePage {
   protected readonly open = signal<string | null>(null);
   protected readonly loadError = signal<string | null>(null);
   protected readonly form = signal<Form | null>(null);
+  /** Person whose profile popup is open. */
+  protected readonly profileId = signal<string | null>(null);
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
 
   /** Active pointers (mouse or fingers) on the empty canvas, in client coordinates. */
   private readonly pointers = new Map<number, Point>();
   private layoutRun = 0;
+  /** The current tap only opened a stack (see tapHousehold). */
+  private firstTap = false;
   private loadTimer?: ReturnType<typeof setTimeout>;
   private saveTimer?: ReturnType<typeof setTimeout>;
   /** Saved position waiting for its person to be laid out. */
@@ -105,7 +115,7 @@ export class HomePage {
   protected readonly cardHeight = CARD_H;
 
   constructor() {
-    addIcons({ add, locateOutline, remove });
+    addIcons({ add, heart, locateOutline, remove });
     // Keep whatever is in the middle of the screen in the middle when the canvas
     // resizes. This also centers the own card on start: ion-content may report
     // zero width or height at first, and the view starts at (0, 0).
@@ -225,13 +235,44 @@ export class HomePage {
     return p.gender === 'male' ? m : p.gender === 'female' ? f : other;
   }
 
-  /**
-   * Fanned-out stack: from where the parents' line reaches the stacked card,
-   * across to the same card's spread-out position (household coordinates).
-   */
+  protected readonly portX = portX;
+
+  /** Stacked: the rest of the parents' line, down to the card behind (household coordinates). */
+  protected stubPath(i: number): string {
+    return `M${portX(i)},${-DROP} V${-i * STACK_OFFSET}`;
+  }
+
+  /** Fanned out: from above the stack across to the same card's spread-out position. */
   protected spreadPath(i: number): string {
-    const stacked = i * STACK_OFFSET + CARD_W / 2;
-    return `M${stacked},${-DROP} H${i * SPREAD_STEP + CARD_W / 2} V0`;
+    return `M${portX(i)},${-DROP} H${i * SPREAD_STEP + CARD_W / 2} V0`;
+  }
+
+  /** Stacked: from the bottom of the card behind down to the line to the children. */
+  protected downStubPath(i: number): string {
+    return `M${downX(i)},${CARD_H - i * STACK_OFFSET} V${CARD_H + DROP}`;
+  }
+
+  /** Fanned out: from the bottom of the spread-out card across to the line to the children. */
+  protected downSpreadPath(i: number): string {
+    return `M${i * SPREAD_STEP + CARD_W / 2},${CARD_H} V${CARD_H + DROP} H${downX(i)}`;
+  }
+
+  /** Fanned out: from partner `j`'s card to card `i`, at photo height, behind any cards between. */
+  protected marriagePath(j: number, i: number): string {
+    return `M${j * SPREAD_STEP + CARD_W},${HEART_Y} H${i * SPREAD_STEP}`;
+  }
+
+  /**
+   * For a card behind the front one: 1 + the index of the nearest card before
+   * it that is their spouse (so 0 means none), for the marriage line and heart.
+   */
+  protected partnerIndex(h: Household, i: number): number {
+    const me = this.people().get(h.members[i]);
+    for (let j = i - 1; j >= 0; j--) {
+      const other = this.people().get(h.members[j]);
+      if (me?.spouses?.includes(h.members[j]) || other?.spouses?.includes(h.members[i])) return j + 1;
+    }
+    return 0;
   }
 
   /** Center of a member's card (stacked, as drawn when not fanned out). */
@@ -357,10 +398,16 @@ export class HomePage {
   }
 
   async startEdit(person: Person): Promise<void> {
-    await this.tree.loadMore(neighbors(person)).catch(() => undefined); // names in the relationship list
-    const name = (id: string) => this.people().get(id)?.name ?? 'Unknown';
+    // Names in the relationship list, and the siblings for the birth order.
+    await this.tree.loadFamily(person.id).catch(() => undefined);
+    const people = this.people();
+    person = people.get(person.id) ?? person;
+    const name = (id: string) => people.get(id)?.name ?? 'Unknown';
     const rel = (ids: string[] | undefined, label: string) =>
       (ids ?? []).filter((id) => id !== person.id).map((id) => ({ id, name: name(id), label }));
+    const siblings = siblingsOf(people, person.id);
+    const orderSlots = siblings.length > 1 ? siblings.length : 0;
+    const orderDefault = siblings.indexOf(person.id);
     this.form.set({
       person,
       title: 'Edit details',
@@ -370,9 +417,33 @@ export class HomePage {
         ...rel(person.siblings, 'Sibling'),
         ...rel(person.children, 'Child'),
       ],
-      canDelete: person.id !== this.tree.rootId,
-      submit: (details) => this.tree.save(person.id, details),
+      // Only people at the end of a branch (see deletePerson); the rest is checked on delete.
+      canDelete: person.id !== this.tree.rootId && !(person.parents?.length && person.children?.length),
+      orderSlots,
+      orderDefault,
+      submit: (details) =>
+        this.tree.save(person.id, details, orderSlots && details.order !== orderDefault ? details.order : undefined),
     });
+  }
+
+  /**
+   * Touch has no hover: the first tap on a stack fans it out and shows its
+   * buttons; tapping a card of an open stack shows the profile.
+   */
+  protected tapHousehold(id: string, e: PointerEvent): void {
+    this.firstTap = e.pointerType !== 'mouse' && this.open() !== id;
+    this.open.set(id);
+  }
+
+  protected showProfile(id: string): void {
+    if (this.firstTap) this.firstTap = false;
+    else this.profileId.set(id);
+  }
+
+  /** Edit button on the profile popup: close it, then open the form. */
+  protected editFromProfile(person: Person): void {
+    this.profileId.set(null);
+    void this.startEdit(person);
   }
 
   async startAdd(of: Person, req: AddRequest): Promise<void> {
@@ -434,13 +505,8 @@ export class HomePage {
   async remove(): Promise<void> {
     const person = this.form()?.person;
     if (!person) return;
-    let removed: string[] = [];
-    if (!(await this.run(async () => (removed = (await this.tree.planDelete(person.id)).remove)))) return;
-    const others = removed.filter((id) => id !== person.id).map((id) => this.people().get(id)?.name);
-    const message = others.length
-      ? `This also deletes ${others.length === 1 ? '1 person' : `${others.length} people`} only connected through them: ${others.join(', ')}.`
-      : 'This cannot be undone.';
-    if (!(await this.confirm(`Delete ${person.name}? ${message}`, 'Delete'))) return;
+    if (!(await this.run(() => this.tree.planDelete(person.id)))) return; // explains why not, if not allowed
+    if (!(await this.confirm(`Delete ${person.name}? This cannot be undone.`, 'Delete'))) return;
     if (await this.run(() => this.tree.delete(person.id))) this.closeForm();
   }
 

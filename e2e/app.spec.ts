@@ -347,6 +347,8 @@ test('profile page: picture is cropped, shrunk and shown; name editable; email l
   // Picture stays visible in the profile menu after signing in again.
   await login(page, 'user@generations.test');
   await expect(page.locator('app-person-card')).toBeVisible();
+  // The own card has no tree photos, so it shows the profile picture.
+  await expect(page.locator('app-person-card').getByRole('img', { name: /^Profile picture of / })).toBeVisible();
   await page.getByRole('button', { name: 'Profile menu' }).last().click();
   await expect(page.locator('ion-popover ion-item ion-avatar img')).toBeVisible();
 });
@@ -415,12 +417,10 @@ test('family tree: add relatives, remove a relationship and delete a person', as
       expect(Math.abs(dx) <= 60 && Math.abs(dy) <= 60).toBe(true);
     }).toPass({ intervals: [50], timeout: 30_000 });
   }
-  /** Opens a card's buttons (tap), clicks one, fills the name and saves. */
+  /** Opens a card's stack (a tap shows its buttons), clicks one, fills the name and saves. */
   async function addRelative(of: string, button: string, name: string, gender = 'Male') {
     await bringIntoView(of);
-    await card(of)
-      .locator('ion-card')
-      .click({ position: { x: 20, y: 200 } });
+    await card(of).locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
     await page.getByRole('button', { name: `${button} ${of}` }).click();
     await modal.locator('ion-input[formcontrolname=name] input').fill(name);
     await choose(page, 'gender', gender);
@@ -440,9 +440,7 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await addRelative('Ada Admin', 'Add spouse of', 'Partner');
   // A child with a spouse asks for the other parent first.
   await bringIntoView('Ada Admin');
-  await card('Ada Admin')
-    .locator('ion-card')
-    .click({ position: { x: 20, y: 200 } });
+  await card('Ada Admin').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await page.getByRole('button', { name: 'Add child of Ada Admin' }).click();
   await page.locator('ion-alert').getByRole('button', { name: 'OK' }).click();
   await modal.locator('ion-input[formcontrolname=name] input').fill('Kid');
@@ -458,13 +456,11 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   const y = async (name: string) => (await card(name).boundingBox())!.y;
   expect(await y('Father')).toBeLessThan(await y('Ada Admin'));
   expect(await y('Kid')).toBeGreaterThan(await y('Ada Admin'));
-  await expect(page.locator('.lines path')).toHaveCount(6);
+  await expect(page.locator('.lines path')).toHaveCount(7); // the child's line comes from both parents
 
   // Birth order: a new eldest child is drawn left of the younger one.
   await bringIntoView('Ada Admin');
-  await card('Ada Admin')
-    .locator('ion-card')
-    .click({ position: { x: 20, y: 200 } });
+  await card('Ada Admin').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await page.getByRole('button', { name: 'Add child of Ada Admin' }).click();
   await page.locator('ion-alert').getByRole('button', { name: 'OK' }).click();
   await modal.locator('ion-input[formcontrolname=name] input').fill('Elder');
@@ -482,7 +478,10 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await expect(card('Grandfather')).toBeVisible();
   await expect(card('Kid')).toBeVisible();
 
-  // Removing the only link to Father (and Grandfather) is refused.
+  // Removing the only link to Father (and Grandfather) is refused. Partner is a
+  // man, so his card is in front of Ada's: fan the stack out first.
+  await bringIntoView('Ada Admin');
+  await card('Ada Admin').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await page.getByRole('button', { name: 'Edit Ada Admin' }).click();
   await modal.getByRole('button', { name: 'Remove relationship with Father' }).click();
   await page.locator('ion-alert').getByRole('button', { name: 'Remove' }).click();
@@ -493,15 +492,50 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await expect(modal.getByRole('button', { name: 'Remove relationship with Partner' })).toBeHidden();
   await modal.getByRole('button', { name: 'Cancel' }).click();
 
-  // Deleting Father also deletes Grandfather, who is only connected through him.
+  // Birth order can also be changed when editing: Kid becomes the eldest.
+  await bringIntoView('Kid');
+  await page.getByRole('button', { name: 'Edit Kid' }).click();
+  await choose(page, 'order', '1st child (eldest)');
+  await modal.getByRole('button', { name: 'Save' }).click();
+  await expect(modal.locator('form')).toHaveCount(0);
+  await expect.poll(async () => (await x('Kid')) < (await x('Elder'))).toBe(true);
+
+  // Clicking a card opens the profile (on touch, a card of an open stack); its
+  // relatives open theirs, and edit opens the form.
+  await card('Kid').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
+  await card('Kid').locator('ion-card-title').click();
+  const profile = page.locator('ion-modal.profile');
+  await expect(profile.getByRole('heading', { name: 'Kid', exact: true })).toBeVisible();
+  await expect(profile.getByText('Son of Ada Admin')).toBeVisible();
+  await profile.getByRole('button', { name: /^Open Ada Admin, / }).click();
+  await expect(profile.getByRole('heading', { name: 'Ada Admin', exact: true })).toBeVisible();
+  await profile.getByRole('button', { name: 'Edit Ada Admin' }).click();
+  await expect(modal.locator('form')).toBeVisible();
+  await modal.getByRole('button', { name: 'Cancel' }).click();
+  await expect(modal.locator('form')).toHaveCount(0);
+
+  // A date of death marks the card: ribbon and "In loving memory".
+  await bringIntoView('Grandfather');
+  await page.getByRole('button', { name: 'Edit Grandfather' }).click();
+  await modal.locator('ion-input[formcontrolname=birth] input').fill('1920-05-01');
+  await modal.locator('ion-input[formcontrolname=death] input').fill('1990-04-30');
+  await modal.getByRole('button', { name: 'Save' }).click();
+  await expect(card('Grandfather').locator('.memorial')).toHaveText(/In loving memory · aged 69/);
+
+  // Only people at the end of a branch can be deleted: not Father (parents and
+  // children), but Grandfather (the top of the line).
+  await expect(modal.locator('form')).toHaveCount(0);
   await bringIntoView('Father');
   await page.getByRole('button', { name: 'Edit Father' }).click();
+  await expect(modal.getByRole('button', { name: 'Delete person' })).toHaveCount(0);
+  await modal.getByRole('button', { name: 'Cancel' }).click();
+  await expect(modal.locator('form')).toHaveCount(0);
+  await bringIntoView('Grandfather');
+  await page.getByRole('button', { name: 'Edit Grandfather' }).click();
   await modal.getByRole('button', { name: 'Delete person' }).click();
-  await expect(page.locator('ion-alert')).toContainText('Grandfather');
   await page.locator('ion-alert').getByRole('button', { name: 'Delete' }).click();
-  await expect(card('Father')).toBeHidden();
   await expect(card('Grandfather')).toBeHidden();
-  await expect(card('Kid')).toBeVisible();
+  await expect(card('Father')).toBeVisible();
 });
 
 test('family tree: up to 5 photos per person, browsed with arrows and removable', async ({ page }) => {
@@ -517,7 +551,7 @@ test('family tree: up to 5 photos per person, browsed with arrows and removable'
   // Shrunk in the browser before saving.
   const src = await me.locator('.photo img').getAttribute('src');
   expect(src!.length).toBeLessThan(100_000);
-  await me.locator('ion-card').click({ position: { x: 20, y: 250 } });
+  await me.locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await expect(me.getByRole('button', { name: 'Add photo of Ada Admin' })).toBeHidden(); // 5 is the limit
 
   await me.getByRole('button', { name: 'Next photo' }).click();
@@ -529,7 +563,7 @@ test('family tree: up to 5 photos per person, browsed with arrows and removable'
   await page.reload();
   await expect(me.getByRole('img', { name: 'Photo 1 of Ada Admin' })).toBeVisible();
 
-  await me.locator('ion-card').click({ position: { x: 20, y: 250 } });
+  await me.locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await me.getByRole('button', { name: 'Remove this photo' }).click();
   await expect(me.locator('.dots span')).toHaveCount(4);
   await expect(me.getByRole('button', { name: 'Add photo of Ada Admin' })).toBeVisible();
@@ -581,14 +615,11 @@ test('family tree: loads the nearest 10 people first, then more while exploring'
   for (let i = 0; i < 50; i++) await canvas.press('ArrowUp');
   await expect(page.getByRole('heading', { name: 'Ancestor 20', exact: true })).toBeAttached();
 
-  // Deleting checks the whole tree, so the warning names everyone who would go.
+  // Deleting checks the whole tree: a person in the middle of the line can't be deleted.
   await page.reload();
   await expect(cards).toHaveCount(10);
   await page.getByRole('button', { name: 'Edit Ancestor 1' }).dispatchEvent('click'); // above the screen
-  await page.locator('ion-modal').getByRole('button', { name: 'Delete person' }).click();
-  await expect(page.locator('ion-alert')).toContainText('Ancestor 20');
-  await expect(page.locator('ion-alert')).toContainText('19 people');
-  await page.locator('ion-alert').getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.locator('ion-modal').getByRole('button', { name: 'Delete person' })).toHaveCount(0);
 });
 
 test('family tree: "Remember last position" reopens where the user left, only when turned on', async ({ page }) => {
