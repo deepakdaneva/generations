@@ -14,10 +14,18 @@ if (!project) throw new Error('GCLOUD_PROJECT is not set; run via `firebase depl
 const siteUrl = (process.env.SITE_URL || `https://${project}.web.app`).replace(/\/$/, '');
 const robots = /-(uat|dev|test|staging)$/.test(project) ? 'noindex, nofollow' : 'index, follow';
 
+// Shown in the app so a deployment can be recognised, e.g. "v0.0.1 (75c4bb8)".
+const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+const commit = (process.env.GITHUB_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })).slice(0, 7);
+const appVersion = `v${version} (${commit})`;
+
 const file = 'www/index.html';
 const html = readFileSync(file, 'utf8');
 if (!html.includes('__SITE_URL__')) throw new Error(`${file} has no placeholders; run \`npm run build\` first.`);
-writeFileSync(file, html.replaceAll('__SITE_URL__', siteUrl).replaceAll('__ROBOTS__', robots));
+writeFileSync(
+  file,
+  html.replaceAll('__SITE_URL__', siteUrl).replaceAll('__ROBOTS__', robots).replaceAll('__APP_VERSION__', appVersion),
+);
 
 execFileSync(
   process.execPath,
@@ -26,4 +34,4 @@ execFileSync(
     stdio: 'inherit',
   },
 );
-console.log(`prepared ${file} for ${siteUrl} (robots: ${robots})`);
+console.log(`prepared ${file} ${appVersion} for ${siteUrl} (robots: ${robots})`);

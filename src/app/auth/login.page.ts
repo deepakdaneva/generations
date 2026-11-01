@@ -18,6 +18,7 @@ import { addIcons } from 'ionicons';
 import { gitNetworkOutline } from 'ionicons/icons';
 
 import { AuthService } from '../core/auth.service';
+import { appVersion } from '../core/version';
 
 import { authErrorMessage } from './auth-errors';
 import { GoogleButtonComponent } from './google-button.component';
@@ -45,6 +46,7 @@ export class LoginPage {
   private readonly router = inject(Router);
   private readonly alerts = inject(AlertController);
   private readonly toasts = inject(ToastController);
+  protected readonly appVersion = appVersion;
 
   protected readonly busy = signal(false);
   protected readonly inactive = this.auth.signOutReason;

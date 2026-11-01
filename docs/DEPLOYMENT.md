@@ -82,6 +82,10 @@ and `DEPLOY_SERVICE_ACCOUNT` = `github-deployer@P.iam.gserviceaccount.com`.
 They are identifiers, not secrets. Forks use their own owner id, repository and
 projects.
 
+To see which build is live, open the login page or the profile menu: both
+show the version and commit, e.g. `Generations v0.0.1 (75c4bb8)`. The commit
+matches the one the pipeline deployed. Local runs show `dev`.
+
 ## Manual deploy to UAT
 
 The pipeline is the normal path. For a manual deploy from your machine:

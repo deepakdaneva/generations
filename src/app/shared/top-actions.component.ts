@@ -24,6 +24,7 @@ import { logOutOutline, personCircle, settingsOutline } from 'ionicons/icons';
 
 import { AuthService } from '../core/auth.service';
 import { ThemeService, type ThemeMode } from '../core/theme';
+import { appVersion } from '../core/version';
 
 /**
  * Header-less page chrome: a floating menu button (only shown to admins, via the
@@ -72,6 +73,7 @@ import { ThemeService, type ThemeMode } from '../core/theme';
               <ion-label>Logout</ion-label>
             </ion-item>
           </ion-list>
+          <p class="app-version">Generations {{ appVersion }}</p>
         </ion-content>
       </ng-template>
     </ion-popover>
@@ -118,6 +120,11 @@ import { ThemeService, type ThemeMode } from '../core/theme';
       width: 32px;
       height: 32px;
     }
+    .app-version {
+      margin: 0 16px 12px;
+      font-size: 0.75em;
+      color: var(--ion-color-medium);
+    }
     .menu-avatar-icon {
       width: 100%;
       height: 100%;
@@ -156,6 +163,7 @@ import { ThemeService, type ThemeMode } from '../core/theme';
 export class TopActionsComponent {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  protected readonly appVersion = appVersion;
 
   protected readonly theme = inject(ThemeService);
   protected readonly themes: { value: ThemeMode; label: string }[] = [
