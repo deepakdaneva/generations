@@ -14,18 +14,25 @@ if (!project) throw new Error('GCLOUD_PROJECT is not set; run via `firebase depl
 const siteUrl = (process.env.SITE_URL || `https://${project}.web.app`).replace(/\/$/, '');
 const robots = /-(uat|dev|test|staging)$/.test(project) ? 'noindex, nofollow' : 'index, follow';
 
-// Shown in the app so a deployment can be recognised, e.g. "v0.0.1 (75c4bb8)".
+// Build details shown on the login and About pages (src/app/core/version.ts).
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
-const commit = (process.env.GITHUB_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })).slice(0, 7);
-const appVersion = `v${version} (${commit})`;
+const commit = (process.env.GITHUB_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })).trim();
+const appVersion = `v${version} (${commit.slice(0, 7)})`;
+
+const values = {
+  __SITE_URL__: siteUrl,
+  __ROBOTS__: robots,
+  __APP_VERSION__: version,
+  __APP_COMMIT__: commit,
+  __APP_BUILT__: new Date().toISOString(),
+  __APP_PROJECT__: project,
+};
 
 const file = 'www/index.html';
-const html = readFileSync(file, 'utf8');
+let html = readFileSync(file, 'utf8');
 if (!html.includes('__SITE_URL__')) throw new Error(`${file} has no placeholders; run \`npm run build\` first.`);
-writeFileSync(
-  file,
-  html.replaceAll('__SITE_URL__', siteUrl).replaceAll('__ROBOTS__', robots).replaceAll('__APP_VERSION__', appVersion),
-);
+for (const [placeholder, value] of Object.entries(values)) html = html.replaceAll(placeholder, value);
+writeFileSync(file, html);
 
 execFileSync(
   process.execPath,

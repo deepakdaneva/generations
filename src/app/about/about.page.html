@@ -1,0 +1,58 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/"></ion-back-button>
+    </ion-buttons>
+    <ion-title>About</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="about">
+    <section class="intro">
+      <img src="icons/icon.svg" alt="" width="88" height="88" />
+      <h1>Generations</h1>
+      <p>Every family has a story. Build, keep and share your family tree together.</p>
+    </section>
+
+    <ion-list>
+      <ion-list-header><ion-label>Build</ion-label></ion-list-header>
+      <ion-item>
+        <ion-label>Version</ion-label>
+        <ion-note slot="end">{{ build.version ?? 'dev' }}</ion-note>
+      </ion-item>
+      <ion-item [href]="commitUrl" target="_blank" rel="noopener" [button]="!!commitUrl" [detail]="false">
+        <ion-label>Commit</ion-label>
+        <ion-note slot="end" class="mono">{{ build.commit?.slice(0, 7) ?? '–' }}</ion-note>
+      </ion-item>
+      <ion-item>
+        <ion-label>Deployed</ion-label>
+        <ion-note slot="end">{{ build.builtAt ? (build.builtAt | date: 'medium') : '–' }}</ion-note>
+      </ion-item>
+      <ion-item>
+        <ion-label>Environment</ion-label>
+        <ion-note slot="end">{{ environment }}</ion-note>
+      </ion-item>
+
+      <ion-list-header><ion-label>Project</ion-label></ion-list-header>
+      <ion-item [href]="repo" target="_blank" rel="noopener" detail="true">
+        <ion-label>Source code on GitHub</ion-label>
+      </ion-item>
+      <ion-item [href]="repo + '/issues'" target="_blank" rel="noopener" detail="true">
+        <ion-label>Report a problem or suggest a feature</ion-label>
+      </ion-item>
+      <ion-item [href]="repo + '/security/policy'" target="_blank" rel="noopener" detail="true">
+        <ion-label>Security policy</ion-label>
+      </ion-item>
+      <ion-item [href]="repo + '/blob/main/LICENSE'" target="_blank" rel="noopener" detail="true">
+        <ion-label>License</ion-label>
+        <ion-note slot="end">MIT</ion-note>
+      </ion-item>
+    </ion-list>
+
+    <p class="footer">
+      © 2026 Deepak Kumar Jangir and contributors.<br />
+      Built with Ionic, Angular and Firebase.
+    </p>
+  </div>
+</ion-content>

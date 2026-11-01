@@ -33,6 +33,11 @@ export const routes: Routes = [
     canActivate: [adminGuard],
     loadComponent: () => import('./users/users.page').then((m) => m.UsersPage),
   },
+  {
+    path: 'about',
+    title: 'About · Generations',
+    loadComponent: () => import('./about/about.page').then((m) => m.AboutPage),
+  },
   { path: '', redirectTo: 'home', pathMatch: 'full' },
   { path: '**', redirectTo: 'home' },
 ];

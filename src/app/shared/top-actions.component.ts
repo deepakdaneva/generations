@@ -20,11 +20,10 @@ import {
   IonToolbar,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { logOutOutline, personCircle, settingsOutline } from 'ionicons/icons';
+import { informationCircleOutline, logOutOutline, personCircle, settingsOutline } from 'ionicons/icons';
 
 import { AuthService } from '../core/auth.service';
 import { ThemeService, type ThemeMode } from '../core/theme';
-import { appVersion } from '../core/version';
 
 /**
  * Header-less page chrome: a floating menu button (only shown to admins, via the
@@ -72,8 +71,11 @@ import { appVersion } from '../core/version';
               <ion-icon slot="start" name="log-out-outline" aria-hidden="true"></ion-icon>
               <ion-label>Logout</ion-label>
             </ion-item>
+            <ion-item button detail="false" (click)="openAbout()">
+              <ion-icon slot="start" name="information-circle-outline" aria-hidden="true"></ion-icon>
+              <ion-label>About</ion-label>
+            </ion-item>
           </ion-list>
-          <p class="app-version">Generations {{ appVersion }}</p>
         </ion-content>
       </ng-template>
     </ion-popover>
@@ -120,11 +122,6 @@ import { appVersion } from '../core/version';
       width: 32px;
       height: 32px;
     }
-    .app-version {
-      margin: 0 16px 12px;
-      font-size: 0.75em;
-      color: var(--ion-color-medium);
-    }
     .menu-avatar-icon {
       width: 100%;
       height: 100%;
@@ -163,7 +160,6 @@ import { appVersion } from '../core/version';
 export class TopActionsComponent {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  protected readonly appVersion = appVersion;
 
   protected readonly theme = inject(ThemeService);
   protected readonly themes: { value: ThemeMode; label: string }[] = [
@@ -178,7 +174,7 @@ export class TopActionsComponent {
   protected profileEvent?: Event;
 
   constructor() {
-    addIcons({ personCircle, logOutOutline, settingsOutline });
+    addIcons({ personCircle, logOutOutline, settingsOutline, informationCircleOutline });
   }
 
   openProfile(event: Event): void {
@@ -190,6 +186,11 @@ export class TopActionsComponent {
     // Close the popover fully first; otherwise its overlay stays over the new page.
     await this.profilePopover().dismiss();
     await this.router.navigateByUrl('/profile');
+  }
+
+  async openAbout(): Promise<void> {
+    await this.profilePopover().dismiss();
+    await this.router.navigateByUrl('/about');
   }
 
   openSettings(): void {
