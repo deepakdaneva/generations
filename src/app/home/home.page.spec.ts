@@ -2,10 +2,17 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import { NotificationService } from '../core/notifications.service';
 import { fakeAuth } from '../testing/fake-auth';
 import { TreeService, type Person } from '../tree/tree.service';
 
 import { HomePage } from './home.page';
+
+// jsdom has no ResizeObserver; the canvas only needs it to keep the view centered.
+globalThis.ResizeObserver ??= class {
+  observe(): void {}
+  disconnect(): void {}
+} as unknown as typeof ResizeObserver;
 
 describe('HomePage', () => {
   it('lays out the tree around the own card, with placeholders for relatives not loaded yet', async () => {
@@ -18,6 +25,7 @@ describe('HomePage', () => {
       providers: [
         provideRouter([]),
         fakeAuth({ displayName: 'Ada' }),
+        { provide: NotificationService, useValue: { items: signal([]), unread: signal(0), isNew: () => false } },
         {
           provide: TreeService,
           useValue: {

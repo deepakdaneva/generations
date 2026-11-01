@@ -117,6 +117,46 @@ service cloud.firestore {
         && data.updatedAt == request.time;
     }
 
+    // Notifications for admins. Today the only kind: a new self-registered
+    // account asks to be approved. The new user's browser creates it (there is
+    // no backend on the Spark plan), only for themselves (id = their uid, so at
+    // most one), only as pending and only while their profile is inactive.
+    // Admins read them, mark them read (readBy), and approve or reject once;
+    // approving must activate the user in the same batch.
+    match /notifications/{id} {
+      allow read: if isAdmin() && resource.data.audience == 'admins';
+      allow create: if verified()
+        && id == request.auth.uid
+        && request.resource.data.keys().hasOnly(
+          ['type', 'audience', 'userId', 'email', 'displayName', 'status', 'readBy', 'createdAt'])
+        && request.resource.data.type == 'account-approval'
+        && request.resource.data.audience == 'admins'
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && validName(request.resource.data.displayName)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.readBy == []
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == false;
+      allow update: if isAdmin() && resource.data.audience == 'admins' && (
+          // Opened: add yourself to readBy, nothing else.
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+            && request.resource.data.readBy.toSet()
+              == resource.data.readBy.toSet().union([request.auth.uid].toSet()))
+          // Acted on: once, by you, now; approving activates the user too.
+          || (resource.data.status == 'pending'
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'actedBy', 'actedAt', 'readBy'])
+            && request.resource.data.status in ['approved', 'rejected']
+            && request.resource.data.actedBy == request.auth.uid
+            && request.resource.data.actedAt == request.time
+            && request.resource.data.readBy is list && request.resource.data.readBy.size() <= 100
+            && (request.resource.data.status == 'rejected'
+              || getAfter(/databases/$(database)/documents/users/$(resource.data.userId)).data.active == true))
+        );
+      allow delete: if false;
+    }
+
     // Tree settings: "remember last position" and the saved position (the person
     // near the middle of the screen, the chain of ids to load them from the
     // user's own card, the offset from their card and the zoom).

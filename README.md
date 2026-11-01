@@ -55,6 +55,13 @@ reasoning behind these choices.
   link (max 2 per day per device; also applies to "Forgot password?").
   Your picture appears on the profile button, in the profile menu and in the
   Users list.
+- **Notifications** (bell next to the profile button): admins are notified
+  when someone registers or signs in with Google for the first time. The
+  badge counts requests that are still waiting and that you have not opened.
+  Opening one shows the account with **Approve** and **Reject**; once any
+  admin has acted, the buttons are off for everyone and the name opens the
+  user on the Users page. Activating a user on the Users page resolves their
+  request too.
 - **Settings page** (profile button → Settings):
   - Theme: System default, Light or Dark. Saved per device; System default
     follows the OS live.
@@ -113,7 +120,7 @@ reasoning behind these choices.
 │   │   ├── home/           Home page (family-tree canvas: pan, zoom)
 │   │   ├── profile/        Profile page (name, picture, password reset link)
 │   │   ├── settings/       Settings page (theme, remember last position)
-│   │   ├── shared/         Floating menu and profile buttons (no header bar)
+│   │   ├── shared/         Floating menu, profile button and notifications bell (no header bar)
 │   │   ├── tree/           Family-tree data service, person card, edit form
 │   │   └── users/          User Management page (admins)
 │   ├── assets/             Static assets

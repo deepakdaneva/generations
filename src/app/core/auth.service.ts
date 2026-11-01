@@ -16,7 +16,16 @@ import {
   connectAuthEmulator,
   type User,
 } from 'firebase/auth';
-import { deleteField, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, type Unsubscribe } from 'firebase/firestore';
+import {
+  deleteField,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  writeBatch,
+  type Unsubscribe,
+} from 'firebase/firestore';
 
 import { environment } from '../../environments/environment';
 
@@ -40,6 +49,20 @@ function randomPassword(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(24));
   // Fixed prefix satisfies any upper/lower/digit/symbol password policy.
   return 'Aa1!' + btoa(String.fromCharCode(...bytes));
+}
+
+/** A new account's request to the admins to approve it (notifications/{uid}). */
+function approvalRequest(uid: string, email: string, displayName: string) {
+  return {
+    type: 'account-approval',
+    audience: 'admins',
+    userId: uid,
+    email,
+    displayName,
+    status: 'pending',
+    readBy: [],
+    createdAt: serverTimestamp(),
+  };
 }
 
 /** Why the current session ended, shown on the login page. */
@@ -211,15 +234,20 @@ export class AuthService {
       { includeMetadataChanges: true },
       async (snap) => {
         if (!snap.exists()) {
-          // First verified sign-in of a self-registered user: create the profile,
-          // inactive until an admin approves it.
-          await setDoc(ref, {
+          // First verified sign-in of a self-registered user (email or Google):
+          // create the profile, inactive until an admin approves it, and in the
+          // same write ask the admins for approval (see firestore.rules).
+          const displayName = user.displayName || user.email?.split('@')[0] || 'User';
+          const batch = writeBatch(this.db);
+          batch.set(ref, {
             email: user.email,
-            displayName: user.displayName || user.email?.split('@')[0] || 'User',
+            displayName,
             role: 'user',
             active: false, // waits for an admin to approve (rules enforce this)
             createdAt: serverTimestamp(),
-          }).catch(failClosed);
+          });
+          batch.set(doc(this.db, 'notifications', user.uid), approvalRequest(user.uid, user.email ?? '', displayName));
+          await batch.commit().catch(failClosed);
           return; // the snapshot fires again with the new profile
         }
         const profile = { id: snap.id, ...snap.data() } as UserProfile;
@@ -227,6 +255,12 @@ export class AuthService {
           // Wait until a just-created profile reaches the server; signing out
           // earlier would drop the pending write.
           if (snap.metadata.hasPendingWrites) return;
+          // Accounts registered before notifications existed have no request
+          // yet: create it. The rules refuse it when one exists already.
+          await setDoc(
+            doc(this.db, 'notifications', user.uid),
+            approvalRequest(user.uid, profile.email, profile.displayName),
+          ).catch(() => undefined);
           this.signOutReason.set('inactive');
           await signOut(this.auth);
           return;

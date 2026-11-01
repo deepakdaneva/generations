@@ -252,7 +252,12 @@ test('Google sign-in creates a normal user profile that waits for approval', asy
 
   // The Auth emulator's fake Google account picker.
   const popup = await popupPromise;
-  await popup.locator('#add-account-button button').click();
+  // On slow machines the first click can land before the picker's script is
+  // ready and do nothing, so click until the form appears.
+  await expect(async () => {
+    await popup.locator('#add-account-button button').click();
+    await expect(popup.locator('#email-input')).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20_000 });
   await popup.locator('#email-input').fill(email);
   await popup.locator('#display-name-input').fill('Google Member');
   await popup.locator('#sign-in').click();
@@ -395,22 +400,20 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   const modal = page.locator('ion-modal');
   /** Pans with the arrow keys (60 px each) until the card is near the middle of the screen. */
   async function bringIntoView(name: string) {
-    // Wait until re-layout animations have settled.
-    let box = (await card(name).boundingBox())!;
-    await expect
-      .poll(async () => {
-        const prev = box;
-        box = (await card(name).boundingBox())!;
-        return box.x === prev.x && box.y === prev.y;
-      })
-      .toBe(true);
-    const size = page.viewportSize()!;
+    // A closing modal still holds the keyboard focus; wait until it is gone.
+    await expect(modal.locator('form')).toHaveCount(0);
     const canvas = page.locator('.tree-canvas');
     await canvas.focus();
-    const dx = Math.round((size.width / 2 - (box.x + box.width / 2)) / 60);
-    const dy = Math.round((size.height / 2 - (box.y + box.height / 2)) / 60);
-    for (let i = 0; i < Math.abs(dx); i++) await canvas.press(dx > 0 ? 'ArrowLeft' : 'ArrowRight');
-    for (let i = 0; i < Math.abs(dy); i++) await canvas.press(dy > 0 ? 'ArrowUp' : 'ArrowDown');
+    // Measure again after every step: cards can still move after a re-layout.
+    await expect(async () => {
+      const box = (await card(name).boundingBox())!;
+      const size = page.viewportSize()!;
+      const dx = size.width / 2 - (box.x + box.width / 2);
+      const dy = size.height / 2 - (box.y + box.height / 2);
+      if (Math.abs(dx) > 60) await canvas.press(dx > 0 ? 'ArrowLeft' : 'ArrowRight');
+      if (Math.abs(dy) > 60) await canvas.press(dy > 0 ? 'ArrowUp' : 'ArrowDown');
+      expect(Math.abs(dx) <= 60 && Math.abs(dy) <= 60).toBe(true);
+    }).toPass({ intervals: [50], timeout: 30_000 });
   }
   /** Opens a card's buttons (tap), clicks one, fills the name and saves. */
   async function addRelative(of: string, button: string, name: string, gender = 'Male') {
@@ -650,4 +653,57 @@ test('family tree: "Remember last position" reopens where the user left, only wh
   await page.goto('/home');
   await relogin();
   await expect.poll(box).toEqual(centered);
+});
+
+test('admins are notified of new accounts, and approve them from the notification', async ({ page }) => {
+  test.slow(); // several sign-ins
+  // A new, verified account signs in for the first time: the app creates its
+  // inactive profile and, with it, the approval request for the admins.
+  const email = `new-${Date.now()}@generations.test`;
+  await fetch(`${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/projects/demo-generations/accounts`, {
+    method: 'POST',
+    headers: OWNER,
+    body: JSON.stringify({ email, password: PASSWORD, displayName: 'Nora New', emailVerified: true }),
+  });
+  await login(page, email);
+  await expect(page.getByText("Your account isn't active")).toBeVisible();
+
+  // The admin's bell counts it (other tests may have left requests too).
+  await login(page, 'admin@generations.test');
+  const bell = page.getByRole('button', { name: /^Notifications/ }).filter({ visible: true });
+  await expect(bell).toHaveAccessibleName(/Notifications, \d+ new/);
+  const count = Number(/(\d+) new/.exec((await bell.getAttribute('aria-label')) ?? '')![1]);
+  const badge = (n: number) => (n ? `Notifications, ${n} new` : 'Notifications');
+
+  await bell.click();
+  const item = page.locator('ion-popover ion-item', { hasText: 'Nora New wants to join' });
+  await expect(item).toHaveClass(/\bnew\b/);
+  await item.click();
+  const details = page.locator('ion-modal', { hasText: 'New account' });
+  await expect(details.getByText(`(${email})`)).toBeVisible();
+  await details.getByRole('button', { name: 'Approve' }).click();
+  await expect(details.getByText(/Approved\s+by you/)).toBeVisible();
+  await expect(details.getByRole('button', { name: 'Approve' })).toBeDisabled();
+  await expect(details.getByRole('button', { name: 'Reject' })).toBeDisabled();
+  await details.getByRole('button', { name: 'Close' }).click();
+  // Opened and acted on: one less on the badge.
+  await expect(bell).toHaveAccessibleName(badge(count - 1));
+
+  // Still listed, no longer highlighted; opening it again keeps the buttons off,
+  // and the name leads to the user on the Users page.
+  await bell.click();
+  await expect(item).not.toHaveClass(/\bnew\b/);
+  await expect(item).toContainText('Approved');
+  await item.click();
+  await expect(details.getByRole('button', { name: 'Approve' })).toBeDisabled();
+  await details.getByRole('link', { name: 'Nora New' }).click();
+  await expect(page).toHaveURL(/\/users/);
+  await expect(page.locator('ion-action-sheet')).toContainText('Nora New');
+  await page.locator('ion-action-sheet').getByRole('button', { name: 'Cancel' }).click();
+
+  // Approved: the new user can sign in.
+  await page.getByRole('button', { name: 'Profile menu' }).filter({ visible: true }).click();
+  await page.getByText('Logout').click();
+  await login(page, email);
+  await expect(page).toHaveURL(/\/home$/);
 });

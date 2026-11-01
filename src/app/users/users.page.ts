@@ -1,5 +1,7 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   ActionSheetController,
   IonAvatar,
@@ -32,6 +34,7 @@ import { add, personCircleOutline } from 'ionicons/icons';
 import { authErrorMessage } from '../auth/auth-errors';
 import { AuthService, type Role, type UserProfile } from '../core/auth.service';
 import { FIRESTORE } from '../core/firebase';
+import { NotificationService } from '../core/notifications.service';
 import { TopActionsComponent } from '../shared/top-actions.component';
 
 @Component({
@@ -69,6 +72,10 @@ export class UsersPage {
   private readonly db = inject(FIRESTORE);
   private readonly sheets = inject(ActionSheetController);
   private readonly toasts = inject(ToastController);
+  private readonly notifications = inject(NotificationService);
+  private readonly router = inject(Router);
+  /** ?user=<uid> (e.g. from a notification) opens that user's actions. */
+  private readonly requested = toSignal(inject(ActivatedRoute).queryParamMap);
 
   protected readonly users = signal<UserProfile[] | null>(null);
   protected readonly search = signal('');
@@ -99,6 +106,13 @@ export class UsersPage {
       () => this.toast('Could not load users.', 'danger'),
     );
     inject(DestroyRef).onDestroy(stop);
+    effect(() => {
+      const id = this.requested()?.get('user');
+      const user = id && this.users()?.find((u) => u.id === id);
+      if (!user) return;
+      void this.router.navigate([], { queryParams: {}, replaceUrl: true }); // open it once
+      if (user.id !== this.auth.profile()?.id) void this.manage(user);
+    });
   }
 
   async manage(user: UserProfile): Promise<void> {
@@ -141,7 +155,9 @@ export class UsersPage {
 
   private async update(user: UserProfile, changes: Partial<Pick<UserProfile, 'role' | 'active'>>): Promise<void> {
     try {
-      await updateDoc(doc(this.db, 'users', user.id), changes);
+      // Activating also resolves the user's pending approval request for every admin.
+      if (changes.active === true) await this.notifications.activate(user.id);
+      else await updateDoc(doc(this.db, 'users', user.id), changes);
       await this.toast(`${user.displayName} updated.`);
     } catch {
       await this.toast('Update failed. You may not have permission.', 'danger');
