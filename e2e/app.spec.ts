@@ -252,7 +252,12 @@ test('Google sign-in creates a normal user profile that waits for approval', asy
 
   // The Auth emulator's fake Google account picker.
   const popup = await popupPromise;
-  await popup.locator('#add-account-button button').click();
+  // On slow machines the first click can land before the picker's script is
+  // ready and do nothing, so click until the form appears.
+  await expect(async () => {
+    await popup.locator('#add-account-button button').click();
+    await expect(popup.locator('#email-input')).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20_000 });
   await popup.locator('#email-input').fill(email);
   await popup.locator('#display-name-input').fill('Google Member');
   await popup.locator('#sign-in').click();
@@ -397,22 +402,18 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   async function bringIntoView(name: string) {
     // A closing modal still holds the keyboard focus; wait until it is gone.
     await expect(modal.locator('form')).toHaveCount(0);
-    // Wait until re-layout animations have settled.
-    let box = (await card(name).boundingBox())!;
-    await expect
-      .poll(async () => {
-        const prev = box;
-        box = (await card(name).boundingBox())!;
-        return box.x === prev.x && box.y === prev.y;
-      })
-      .toBe(true);
-    const size = page.viewportSize()!;
     const canvas = page.locator('.tree-canvas');
     await canvas.focus();
-    const dx = Math.round((size.width / 2 - (box.x + box.width / 2)) / 60);
-    const dy = Math.round((size.height / 2 - (box.y + box.height / 2)) / 60);
-    for (let i = 0; i < Math.abs(dx); i++) await canvas.press(dx > 0 ? 'ArrowLeft' : 'ArrowRight');
-    for (let i = 0; i < Math.abs(dy); i++) await canvas.press(dy > 0 ? 'ArrowUp' : 'ArrowDown');
+    // Measure again after every step: cards can still move after a re-layout.
+    await expect(async () => {
+      const box = (await card(name).boundingBox())!;
+      const size = page.viewportSize()!;
+      const dx = size.width / 2 - (box.x + box.width / 2);
+      const dy = size.height / 2 - (box.y + box.height / 2);
+      if (Math.abs(dx) > 60) await canvas.press(dx > 0 ? 'ArrowLeft' : 'ArrowRight');
+      if (Math.abs(dy) > 60) await canvas.press(dy > 0 ? 'ArrowUp' : 'ArrowDown');
+      expect(Math.abs(dx) <= 60 && Math.abs(dy) <= 60).toBe(true);
+    }).toPass({ intervals: [50], timeout: 30_000 });
   }
   /** Opens a card's buttons (tap), clicks one, fills the name and saves. */
   async function addRelative(of: string, button: string, name: string, gender = 'Male') {
