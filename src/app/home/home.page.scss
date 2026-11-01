@@ -33,12 +33,29 @@
 
   path {
     fill: none;
+  }
+
+  .gap {
+    stroke: var(--ion-background-color, #fff);
+    stroke-width: 8;
+  }
+
+  .line {
     stroke: var(--ion-color-medium);
     stroke-width: 2;
     stroke-linecap: round;
     // New lines draw themselves in (pathLength="1" makes the dash the whole line).
     stroke-dasharray: 1;
     animation: draw 0.6s ease-out;
+    transition:
+      stroke 0.2s ease,
+      stroke-width 0.2s ease;
+  }
+
+  // Lines to the parents and children of the hovered or open stack.
+  .highlight .line {
+    stroke: var(--ion-color-primary);
+    stroke-width: 3;
   }
 }
 
@@ -79,20 +96,54 @@
   }
 }
 
-// Lines to fanned-out spouse cards: only while the stack is fanned out.
+// Lines to the cards behind the front one: to the stacked card, or (fanned out)
+// across to the spread-out card, plus the marriage line between spouses.
 .spread-lines {
   position: absolute;
   overflow: visible;
   width: 1px;
   height: 1px;
-  opacity: 0;
-  transition: opacity 0.25s ease;
 
   path {
     fill: none;
     stroke: var(--ion-color-medium);
     stroke-width: 2;
+    transition: opacity 0.25s ease;
   }
+
+  .marriage {
+    stroke: var(--ion-color-danger);
+  }
+
+  .spread {
+    opacity: 0;
+  }
+
+  .household:hover &,
+  .household:focus-within &,
+  .household.open & {
+    .stacked {
+      opacity: 0;
+    }
+    .spread {
+      opacity: 1;
+    }
+  }
+}
+
+// Beating heart on the marriage line, in the gap left of the spouse's fanned-out card.
+.married {
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--i) * 304px - 22px);
+  top: 82px;
+  font-size: 22px;
+  color: var(--ion-color-danger);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  animation: beat 1.4s ease-in-out infinite;
 
   .household:hover &,
   .household:focus-within &,
@@ -101,13 +152,28 @@
   }
 }
 
+@keyframes beat {
+  0%,
+  45%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  15% {
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+  30% {
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
 // Relationship label on the line just above a card (son, daughter, sister, ...).
-// Positions follow the card: stacked (14px steps) or fanned out (304px steps); 130px is half a card.
+// Positions follow the line: stacked (--port: where it reaches the stack) or fanned out
+// (304px steps); 130px is half a card.
 .relation {
   position: absolute;
   z-index: 20;
-  left: calc(var(--i) * 14px + 130px);
-  top: calc(-34px - var(--i) * 14px);
+  left: var(--port);
+  top: -34px;
   transform: translate(-50%, -50%);
   padding: 2px 10px;
   border: 1px solid var(--ion-color-medium);
@@ -140,7 +206,8 @@
   .household,
   .node,
   .relation,
-  .spread-lines,
+  .married,
+  .spread-lines path,
   .lines path {
     transition: none;
     animation: none;

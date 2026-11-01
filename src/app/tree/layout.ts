@@ -18,6 +18,20 @@ export const SPREAD_STEP = 304;
  * relationship label and the line to a fanned-out spouse card fit above it.
  */
 export const DROP = 56;
+/**
+ * Where the line from a spouse's parents reaches a card behind the front one:
+ * near its right edge, well apart from the front card's line in the middle.
+ */
+export const BACK_PORT = CARD_W - 24;
+
+/** Port (line end) of stack member `i` along the top of the household, relative to its left edge. */
+export const portX = (i: number): number => (i ? i * STACK_OFFSET + BACK_PORT : CARD_W / 2);
+
+/**
+ * Where the line to a parent's children leaves stack member `i` at the bottom:
+ * the front card's middle, or the strip of a card behind that shows on the right.
+ */
+export const downX = (i: number): number => (i ? i * STACK_OFFSET + CARD_W - STACK_OFFSET / 2 : CARD_W / 2);
 
 /** A person with their spouses, drawn as one stack of cards. Members: front card first; x/y: its top-left. */
 export interface Household {
@@ -25,6 +39,8 @@ export interface Household {
   members: string[];
   /** Per member: whether a line comes down to their card (from parents or a sibling group). */
   linked: boolean[];
+  /** Per member: whether a line goes from their card to their children. */
+  parent: boolean[];
   x: number;
   y: number;
 }
@@ -32,6 +48,8 @@ export interface Household {
 export interface Line {
   id: string;
   d: string;
+  /** The family node (set of parents) the line belongs to: lines of one family join, others only cross. */
+  family: string;
 }
 
 export interface Layout {
@@ -63,7 +81,8 @@ export function withPlaceholders(people: People, unloaded: ReadonlySet<string>):
 }
 
 /**
- * Spouses (and spouses of spouses) form one household. Households are listed
+ * Spouses (and spouses of spouses) form one household; a man's card is in
+ * front (the first male member), the others follow. Households are listed
  * depth-first from the root, each member's own family before the next
  * member's, so ELK places a person's side of the family (parents, their
  * siblings, grandparents) before, and apart from, their spouse's parents.
@@ -84,6 +103,8 @@ export function households(people: People, rootId: string): string[][] {
         }
       }
     }
+    const male = members.findIndex((id) => people.get(id)?.gender === 'male');
+    if (male > 0) members.unshift(...members.splice(male, 1));
     result.push(members);
     for (const id of members) {
       const p = people.get(id)!;
@@ -113,7 +134,8 @@ export function familyGraph(people: People, rootId: string): ElkNode {
 
   // Each card in a stack has its own port on top, where the line from its
   // parents arrives, so a spouse's parents connect to the spouse's card (and
-  // sit on that side). Lines to children leave from one port at the bottom.
+  // sit on that side). Lines to children leave from each parent's own port at
+  // the bottom, so they come from both the father's and the mother's card.
   const nodes: ElkNode[] = groups.map((g) => {
     const id = `h:${g[0]}`;
     return {
@@ -124,20 +146,20 @@ export function familyGraph(people: People, rootId: string): ElkNode {
       ports: [
         ...g.map((m, i) => ({
           id: `${id}:${m}`,
-          x: i * STACK_OFFSET + CARD_W / 2,
+          x: portX(i),
           y: 0,
           width: 0,
           height: 0,
           layoutOptions: { 'elk.port.side': 'NORTH' },
         })),
-        {
-          id: `${id}:down`,
-          x: CARD_W / 2,
+        ...g.map((m, i) => ({
+          id: `${id}:down:${m}`,
+          x: downX(i),
           y: CARD_H,
           width: 0,
           height: 0,
           layoutOptions: { 'elk.port.side': 'SOUTH' },
-        },
+        })),
       ],
     };
   });
@@ -151,7 +173,7 @@ export function familyGraph(people: People, rootId: string): ElkNode {
     if (!families.has(id)) {
       families.add(id);
       nodes.push({ id, width: 1, height: 1 });
-      for (const h of new Set(sources.map((s) => householdOf.get(s)!))) edge(`${h}:down`, id);
+      for (const s of sources) edge(`${householdOf.get(s)!}:down:${s}`, id);
     }
     for (const c of children) edge(id, `${householdOf.get(c)!}:${c}`);
   };
@@ -230,9 +252,16 @@ export async function layoutTree(people: People, rootId: string): Promise<Layout
   const graph = await new ELK().layout(familyGraph(people, rootId));
 
   const groups = new Map(households(people, rootId).map((g) => [`h:${g[0]}`, g]));
-  const rootNode = graph.children!.find((n) => n.id === `h:${rootId}`)!;
-  const ox = rootNode.x! + CARD_W / 2;
-  const oy = rootNode.y! + CARD_H / 2;
+  const rootGroup = [...groups].find(([, g]) => g.includes(rootId))!;
+  const rootNode = graph.children!.find((n) => n.id === rootGroup[0])!;
+  const at = rootGroup[1].indexOf(rootId);
+  const ox = rootNode.x! + at * STACK_OFFSET + CARD_W / 2;
+  const oy = rootNode.y! - at * STACK_OFFSET + CARD_H / 2;
+  // Lines to and from cards behind the front one stop above and below the
+  // stack; the household draws the rest, to the stacked or fanned-out card.
+  const back = new Set([...groups].flatMap(([id, g]) => g.slice(1).map((m) => `${id}:${m}`)));
+  const backDown = new Set([...groups].flatMap(([id, g]) => g.slice(1).map((m) => `${id}:down:${m}`)));
+  const sources = new Set((graph.edges ?? []).map((e) => e.sources[0]));
 
   return {
     households: graph
@@ -240,13 +269,20 @@ export async function layoutTree(people: People, rootId: string): Promise<Layout
       .map((node) => {
         const members = groups.get(node.id)!;
         const linked = members.map((m) => isLinked(people, m));
-        return { id: node.id, members, linked, x: node.x! - ox, y: node.y! - oy };
+        const parent = members.map((m) => sources.has(`${node.id}:down:${m}`));
+        return { id: node.id, members, linked, parent, x: node.x! - ox, y: node.y! - oy };
       }),
     lines: (graph.edges ?? []).flatMap((e) =>
-      (e.sections ?? []).map((s) => ({
-        id: e.id,
-        d: roundedPath([s.startPoint, ...(s.bendPoints ?? []), s.endPoint].map((p) => ({ x: p.x - ox, y: p.y - oy }))),
-      })),
+      (e.sections ?? []).map((s) => {
+        const start = backDown.has(e.sources[0]) ? { x: s.startPoint.x, y: s.startPoint.y + DROP } : s.startPoint;
+        const end = back.has(e.targets[0]) ? { x: s.endPoint.x, y: s.endPoint.y - DROP } : s.endPoint;
+        const from = e.sources[0];
+        return {
+          id: e.id,
+          family: from.startsWith('h:') ? e.targets[0] : from,
+          d: roundedPath([start, ...(s.bendPoints ?? []), end].map((p) => ({ x: p.x - ox, y: p.y - oy }))),
+        };
+      }),
     ),
   };
 }

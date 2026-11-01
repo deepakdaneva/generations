@@ -20,7 +20,7 @@ import { NotificationsBellComponent } from './notifications-bell.component';
 
 /**
  * Header-less page chrome: a floating menu button (only shown to admins, via the
- * menu's disabled state), a profile button and the notifications bell. Place it inside <ion-content>;
+ * menu's disabled state), the notifications bell and a profile button. Place it inside <ion-content>;
  * anything projected into it (e.g. a search bar) sits between the two buttons.
  */
 @Component({
@@ -30,6 +30,7 @@ import { NotificationsBellComponent } from './notifications-bell.component';
     <div class="top-actions">
       <ion-menu-button></ion-menu-button>
       <div class="middle"><ng-content></ng-content></div>
+      <app-notifications-bell></app-notifications-bell>
       <ion-button fill="clear" shape="round" (click)="openProfile($event)" aria-label="Profile menu">
         @if (auth.profile()?.photo; as photo) {
           <ion-avatar slot="icon-only" class="profile-button-avatar"><img [src]="photo" alt="" /></ion-avatar>
@@ -37,7 +38,6 @@ import { NotificationsBellComponent } from './notifications-bell.component';
           <ion-icon slot="icon-only" name="person-circle"></ion-icon>
         }
       </ion-button>
-      <app-notifications-bell></app-notifications-bell>
     </div>
 
     <ion-popover #profilePopover [isOpen]="profileOpen()" [event]="profileEvent" (didDismiss)="profileOpen.set(false)">

@@ -10,7 +10,7 @@ import type { Person } from './tree.service';
  *   stores the same ordered list of the whole group, including themselves.
  *
  * The tree must stay connected to the user's own card, so nothing becomes
- * unreachable: unlinking refuses, deleting also removes what would be cut off.
+ * unreachable: unlinking and deleting refuse what would cut anyone off.
  */
 export type People = ReadonlyMap<string, Person>;
 export type Relation = 'parent' | 'child' | 'sibling' | 'spouse';
@@ -179,6 +179,37 @@ export function addRelative(
   return d.result();
 }
 
+/**
+ * Marries two people already in the tree (e.g. two brothers marrying two
+ * sisters). Not for someone already linked to them as spouse, parent, child
+ * or sibling.
+ */
+export function linkSpouse(people: People, a: string, b: string): Change {
+  if (a === b) throw new RelationError("Someone can't marry themselves.");
+  const pa = people.get(a);
+  const pb = people.get(b);
+  if (!pa || !pb) throw new RelationError('Unknown person');
+  if (spouseCandidates(people, a).every((id) => id !== b))
+    throw new RelationError(`${pb.name} is already related to ${pa.name}.`);
+  const d = new Draft(people);
+  list(d.get(a), 'spouses').push(b);
+  list(d.get(b), 'spouses').push(a);
+  return d.result();
+}
+
+/** People who can be linked as `id`'s spouse: everyone except them and their spouses, parents, children and siblings. */
+export function spouseCandidates(people: People, id: string): string[] {
+  const p = people.get(id);
+  const close = new Set([
+    id,
+    ...(p?.spouses ?? []),
+    ...(p?.parents ?? []),
+    ...(p?.children ?? []),
+    ...siblingsOf(people, id),
+  ]);
+  return [...people.keys()].filter((x) => !close.has(x));
+}
+
 /** Removes every link between `a` and `b` from both; if they are in a sibling group, `b` leaves it. */
 function cut(d: Draft, a: string, b: string): void {
   for (const [from, to] of [
@@ -211,14 +242,19 @@ export function unlink(people: People, rootId: string, a: string, b: string): Ch
 }
 
 /**
- * Deletes `id` and everyone only connected through them (shown to the user
- * before confirming). Children left without parents stay together as
- * siblings. The user's own card cannot be deleted.
+ * Deletes `id`, a person at the end of a branch: no one else may be cut off
+ * from `rootId`, and someone with both parents and children (in the middle
+ * of a line) cannot go. Children of a top-most ancestor left without parents
+ * stay together as siblings. The user's own card cannot be deleted.
  */
 export function deletePerson(people: People, rootId: string, id: string): Change {
   if (id === rootId) throw new RelationError("You can't delete your own card.");
   const target = people.get(id);
   if (!target) throw new RelationError('Unknown person');
+  if (target.parents?.length && target.children?.length)
+    throw new RelationError(
+      `${target.name} has parents and children in the tree. Only people at the end of a branch can be deleted.`,
+    );
   const d = new Draft(people);
   const orphans = (target.children ?? []).filter((c) => people.get(c)?.parents?.every((p) => p === id));
   for (const n of neighbors(target)) cut(d, n, id);
@@ -226,9 +262,32 @@ export function deletePerson(people: People, rootId: string, id: string): Change
 
   const after = d.view();
   after.delete(id);
-  const keep = reachable(after, rootId);
-  // Unreachable people are only linked to each other, so nothing else changes.
-  return d.result([...people.keys()].filter((p) => !keep.has(p)));
+  const lost = people.size - 1 - reachable(after, rootId).size;
+  if (lost > 0) {
+    throw new RelationError(
+      `Deleting ${target.name} would cut off ${lost === 1 ? '1 person' : `${lost} people`} from your tree. Delete them first.`,
+    );
+  }
+  return d.result([id]);
+}
+
+/** Moves `id` to birth-order `position` (0 = eldest) among their full siblings. */
+export function reorder(people: People, id: string, position: number): Change {
+  const d = new Draft(people);
+  const p = d.get(id);
+  const order = siblingsOf(people, id).filter((s) => s !== id);
+  if (p.parents?.length) {
+    for (const parent of p.parents) {
+      const kids = list(d.get(parent), 'children');
+      kids.splice(kids.indexOf(id), 1);
+      placeAt(kids, id, order, position);
+    }
+  } else {
+    const group = [...order];
+    placeAt(group, id, order, position);
+    for (const s of group) d.get(s).siblings = [...group];
+  }
+  return d.result();
 }
 
 /** Shortest chain of ids from `from` to `to` (both included), or null when not connected. */

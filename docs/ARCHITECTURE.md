@@ -176,8 +176,24 @@ of a home-made algorithm. It is the only new runtime dependency.
 - Every card in a stack has its own port on top of the node (fixed port
   positions), and lines from parents end at the port of their child's card.
   So a spouse's parents connect to the spouse's card and ELK places them on
-  that side. When the stack fans out, a short extra line continues from the
-  port to the card's spread-out position, with the relationship label.
+  that side. The front card's port is in the middle; the ports of the cards
+  behind it are near their right edge, so the two lines never run side by
+  side. Lines to cards behind the front one stop 56 px above the stack; the
+  household draws the rest, down to the stacked card or, when the stack fans
+  out, across to the card's spread-out position (with the relationship
+  label). Fanned out, a marriage line with a beating heart joins each spouse
+  to their partner at photo height.
+- A man's card is the front card of his stack (the first male member).
+- Two people already in the tree can be married (`linkSpouse`, e.g. two
+  brothers marrying two sisters); each keeps the line from their own parents,
+  so lines of different families can cross. Lines are drawn per family, each
+  over a wider band in the background colour: a later family's line crossing
+  an earlier one leaves a gap in it, while lines of one family still join.
+  Hovering or tapping a stack highlights the families it belongs to.
+- Lines to children leave from each parent's own port at the bottom of the
+  stack (the front card's middle, or the visible edge of a card behind), so a
+  child's line comes from both parents. Like the lines on top, lines from a
+  card behind start 56 px below the stack and the household draws the rest.
 - Households are given to ELK depth-first from the user's own card, each
   person's family before their spouse's, so the spouse's parents end up
   outside the other partner's parents and their siblings.
@@ -187,7 +203,8 @@ of a home-made algorithm. It is the only new runtime dependency.
   reach each card straight down for at least 56 px, which leaves room for
   the relationship label (son, daughter, child, ...) on the line.
 - Birth order is the order of the parents' `children` lists, which the form
-  sets when a child or sibling is added. Gender is required by the form
+  sets when a child or sibling is added, and changes when a person with
+  siblings is edited. Gender is required by the form
   only, not by the security rules, because adding a relative also rewrites
   older cards that may have no gender yet.
 - Cards have a fixed size, so the layout never waits for rendering. Only the
@@ -325,11 +342,12 @@ Relationship changes (`src/app/tree/relations.ts`) are pure functions that
 return every person to rewrite; the app saves them in one batch write, so
 both sides of a link always change together. The tree stays connected to the
 user's own card: removing a relationship that is someone's only connection
-is refused, and deleting a person also deletes whoever was only connected
-through them (the user sees the names first). Siblings without parents keep
-a shared `siblings` list; adding a parent to one of them makes the parent
-everyone's, and deleting the only parent of several children turns them into
-such a group.
+is refused. Only people at the end of a branch can be deleted: not someone
+with both parents and children, and not when anyone else would lose their
+connection to the user's card (checked against the whole tree). Siblings
+without parents keep a shared `siblings` list; adding a parent to one of
+them makes the parent everyone's, and deleting the only parent (a top-most
+ancestor) of several children turns them into such a group.
 
 The family tree is stored as plaintext for now. A later step encrypts each
 person in the browser before it is written, so the database only holds
