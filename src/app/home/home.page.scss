@@ -65,7 +65,7 @@
   }
 }
 
-// A person and their spouses: a stack of cards that fans out on hover, focus or tap.
+// A person and their spouses, side by side.
 .household {
   position: absolute;
   top: 0;
@@ -81,24 +81,13 @@
 
 .node {
   position: absolute;
-  left: calc(var(--i) * 14px);
-  top: calc(var(--i) * -14px);
+  left: calc(var(--i) * 304px); // card width plus room for the add buttons and the heart
+  top: 0;
   user-select: text;
-  transition:
-    left 0.25s ease,
-    top 0.25s ease;
-
-  .household:hover &,
-  .household:focus-within &,
-  .household.open & {
-    left: calc(var(--i) * 304px); // card width plus room for the add buttons
-    top: 0;
-  }
 }
 
-// Lines to the cards behind the front one: to the stacked card, or (fanned out)
-// across to the spread-out card, plus the marriage line between spouses.
-.spread-lines {
+// Marriage line between spouses' cards.
+.marriage-lines {
   position: absolute;
   overflow: visible;
   width: 1px;
@@ -106,32 +95,12 @@
 
   path {
     fill: none;
-    stroke: var(--ion-color-medium);
-    stroke-width: 2;
-    transition: opacity 0.25s ease;
-  }
-
-  .marriage {
     stroke: var(--ion-color-danger);
-  }
-
-  .spread {
-    opacity: 0;
-  }
-
-  .household:hover &,
-  .household:focus-within &,
-  .household.open & {
-    .stacked {
-      opacity: 0;
-    }
-    .spread {
-      opacity: 1;
-    }
+    stroke-width: 2;
   }
 }
 
-// Beating heart on the marriage line, in the gap left of the spouse's fanned-out card.
+// Beating heart on the marriage line, in the gap left of the spouse's card.
 .married {
   position: absolute;
   z-index: 1;
@@ -140,16 +109,8 @@
   font-size: 22px;
   color: var(--ion-color-danger);
   transform: translate(-50%, -50%);
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
   animation: beat 1.4s ease-in-out infinite;
-
-  .household:hover &,
-  .household:focus-within &,
-  .household.open & {
-    opacity: 1;
-  }
 }
 
 @keyframes beat {
@@ -166,13 +127,11 @@
   }
 }
 
-// Relationship label on the line just above a card (son, daughter, sister, ...).
-// Positions follow the line: stacked (--port: where it reaches the stack) or fanned out
-// (304px steps); 130px is half a card.
+// Relationship label on the line just above a card (son, daughter, sister, ...); 130px is half a card.
 .relation {
   position: absolute;
   z-index: 20;
-  left: var(--port);
+  left: calc(var(--i) * 304px + 130px);
   top: -34px;
   transform: translate(-50%, -50%);
   padding: 2px 10px;
@@ -183,31 +142,11 @@
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;
-  transition:
-    left 0.25s ease,
-    top 0.25s ease,
-    opacity 0.25s ease;
-
-  // Labels of spouse cards behind the front card show once the stack fans out.
-  &.back {
-    opacity: 0;
-  }
-
-  .household:hover &,
-  .household:focus-within &,
-  .household.open & {
-    left: calc(var(--i) * 304px + 130px);
-    top: -34px;
-    opacity: 1;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .household,
-  .node,
-  .relation,
   .married,
-  .spread-lines path,
   .lines path {
     transition: none;
     animation: none;

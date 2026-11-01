@@ -419,7 +419,7 @@ function treeHelpers(page: Page) {
       expect(Math.abs(dx) <= 60 && Math.abs(dy) <= 60).toBe(true);
     }).toPass({ intervals: [50], timeout: 30_000 });
   }
-  /** Opens a card's stack (a tap shows its buttons), clicks one, fills the name and saves. */
+  /** Shows a card's buttons (a tap, as on touch screens), clicks one, fills the name and saves. */
   async function addRelative(of: string, button: string, name: string, gender = 'Male') {
     await bringIntoView(of);
     await card(of).locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
@@ -447,6 +447,8 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await expect(card('Ada Admin')).toBeVisible();
   await addRelative('Ada Admin', 'Add parent of', 'Father');
   await addRelative('Ada Admin', 'Add spouse of', 'Partner');
+  // Married to someone alive: no heart button for another spouse.
+  await expect(page.getByRole('button', { name: 'Add spouse of Ada Admin' })).toHaveCount(0);
   // A child with a spouse asks for the other parent first.
   await bringIntoView('Ada Admin');
   await card('Ada Admin').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
@@ -487,10 +489,8 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await expect(card('Grandfather')).toBeVisible();
   await expect(card('Kid')).toBeVisible();
 
-  // Removing the only link to Father (and Grandfather) is refused. Partner is a
-  // man, so his card is in front of Ada's: fan the stack out first.
+  // Removing the only link to Father (and Grandfather) is refused.
   await bringIntoView('Ada Admin');
-  await card('Ada Admin').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await page.getByRole('button', { name: 'Edit Ada Admin' }).click();
   await modal.getByRole('button', { name: 'Remove relationship with Father' }).click();
   await page.locator('ion-alert').getByRole('button', { name: 'Remove' }).click();
@@ -509,7 +509,7 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await expect(modal.locator('form')).toHaveCount(0);
   await expect.poll(async () => (await x('Kid')) < (await x('Elder'))).toBe(true);
 
-  // Clicking a card opens the profile (on touch, a card of an open stack); its
+  // Clicking a card opens the profile (on touch, after a first tap that shows its buttons); its
   // relatives open theirs, and edit opens the form.
   await card('Kid').locator('ion-card').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await card('Kid').locator('ion-card-title').click();
@@ -567,7 +567,7 @@ test('family tree: two brothers marry two sisters already in the tree; crossing 
   await modal.getByRole('button', { name: 'Save' }).click();
   await expect(modal.locator('form, ion-searchbar')).toHaveCount(0);
 
-  // Dora joins Brother's stack and keeps her line from her father.
+  // Dora appears beside Brother and keeps her line from her father.
   await expect(page.locator('.household', { has: card('Brother') }).locator('app-person-card')).toHaveCount(2);
   await expect(
     page
@@ -576,7 +576,7 @@ test('family tree: two brothers marry two sisters already in the tree; crossing 
       .last(),
   ).toHaveText('Daughter');
   await expect(label('Sam')).toHaveText('Sibling'); // Sam and Brother: siblings without known parents
-  // Every line has a gap band under it; hovering a stack highlights its families' lines.
+  // Every line has a gap band under it; hovering a couple highlights their families' lines.
   await expect(page.locator('.lines path.gap')).toHaveCount(await page.locator('.lines path.line').count());
   await card('Brother').hover();
   await expect(page.locator('.lines g.highlight').first()).toBeAttached();

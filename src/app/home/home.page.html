@@ -40,31 +40,24 @@
         [style.transform]="'translate(' + h.x + 'px, ' + h.y + 'px)'"
         (pointerdown)="tapHousehold(h.id, $event)"
       >
-        <!-- Lines to the cards behind the front one: down to the stacked card, or across to the
-             fanned-out card. Fanned out, a beating heart joins each spouse to their partner. -->
-        <svg class="spread-lines" aria-hidden="true">
-          @for (id of h.members; track id; let i = $index) { @if (i > 0 && h.linked[i]) {
-          <path class="stacked" [attr.d]="stubPath(i)"></path>
-          <path class="spread" [attr.d]="spreadPath(i)"></path>
-          } @if (i > 0 && h.parent[i]) {
-          <path class="stacked" [attr.d]="downStubPath(i)"></path>
-          <path class="spread" [attr.d]="downSpreadPath(i)"></path>
-          } @if (partnerIndex(h, i); as j) {
-          <path class="spread marriage" [attr.d]="marriagePath(j - 1, i)"></path>
+        <!-- A married couple's cards are joined by a line with a beating heart. -->
+        <svg class="marriage-lines" aria-hidden="true">
+          @for (id of h.members; track id; let i = $index) { @if (partnerIndex(h, i); as j) {
+          <path [attr.d]="marriagePath(j - 1, i)"></path>
           } }
         </svg>
         @for (id of h.members; track id; let i = $index) { @if (partnerIndex(h, i)) {
         <ion-icon class="married" name="heart" [style.--i]="i" aria-hidden="true"></ion-icon>
         } } @for (id of h.members; track id; let i = $index) { @if (h.linked[i] && relationLabel(id); as label) {
-        <span class="relation" [class.back]="i > 0" [style.--i]="i" [style.--port]="portX(i) + 'px'">{{ label }}</span>
+        <span class="relation" [style.--i]="i">{{ label }}</span>
         } } @for (id of h.members; track id; let i = $index) { @if (people().get(id); as person) {
         <app-person-card
           class="node"
           [class.active]="open() === h.id"
           [style.--i]="i"
-          [style.z-index]="h.members.length - i"
           [person]="person"
           [canAddParent]="(person.parents?.length ?? 0) < 2"
+          [canAddSpouse]="!hasLivingSpouse(people(), person.id)"
           (edit)="startEdit(person)"
           (view)="showProfile(person.id)"
           (add)="startAdd(person, $event)"
@@ -74,7 +67,6 @@
         <div
           class="node ghost"
           [style.--i]="i"
-          [style.z-index]="h.members.length - i"
           [style.width.px]="cardWidth"
           [style.height.px]="cardHeight"
           aria-hidden="true"

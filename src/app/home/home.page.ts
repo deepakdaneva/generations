@@ -28,12 +28,9 @@ import { TopActionsComponent } from '../shared/top-actions.component';
 import {
   CARD_H,
   CARD_W,
-  DROP,
-  downX,
+  cardMid,
   layoutTree,
-  portX,
-  SPREAD_STEP,
-  STACK_OFFSET,
+  SPOUSE_STEP,
   withPlaceholders,
   type Household,
   type Layout,
@@ -42,13 +39,15 @@ import {
 import { PersonCardComponent, type AddRequest } from '../tree/person-card.component';
 import { PersonEditComponent, type PersonForm } from '../tree/person-edit.component';
 import { PersonProfileComponent } from '../tree/person-profile.component';
-import { childrenOf, pathTo, RelationError, siblingsOf, spouseCandidates } from '../tree/relations';
+import { childrenOf, hasLivingSpouse, pathTo, RelationError, siblingsOf, spouseCandidates } from '../tree/relations';
 import { TreeService, type Person, type SavedView } from '../tree/tree.service';
 import { zoomAt, type View } from '../tree/view';
 
 type Point = { x: number; y: number };
-/** Height of the marriage line and heart between fanned-out spouse cards: the middle of the photo. */
+/** Height of the marriage line and heart between spouses' cards: the middle of the photo. */
 const HEART_Y = 82;
+/** Width of a household: its cards side by side. */
+const width = (h: Household) => CARD_W + (h.members.length - 1) * SPOUSE_STEP;
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
@@ -96,7 +95,7 @@ export class HomePage {
   protected readonly layout = signal<Layout | null>(null);
   protected readonly view = signal<View>({ x: 0, y: 0, z: 1 });
   protected readonly dragging = signal(false);
-  /** Household whose cards are fanned out and show their buttons (touch has no hover). */
+  /** Household whose cards show their buttons (touch has no hover). */
   protected readonly open = signal<string | null>(null);
   protected readonly loadError = signal<string | null>(null);
   protected readonly form = signal<Form | null>(null);
@@ -130,13 +129,14 @@ export class HomePage {
   /** Active pointers (mouse or fingers) on the empty canvas, in client coordinates. */
   private readonly pointers = new Map<number, Point>();
   private layoutRun = 0;
-  /** The current tap only opened a stack (see tapHousehold). */
+  /** The current tap only showed a household's buttons (see tapHousehold). */
   private firstTap = false;
   private loadTimer?: ReturnType<typeof setTimeout>;
   private saveTimer?: ReturnType<typeof setTimeout>;
   /** Saved position waiting for its person to be laid out. */
   private restore: SavedView | null = null;
   private lastSaved = '';
+  protected readonly hasLivingSpouse = hasLivingSpouse;
   protected readonly cardWidth = CARD_W;
   protected readonly cardHeight = CARD_H;
 
@@ -205,7 +205,7 @@ export class HomePage {
     const left = -view.x / view.z - mx;
     const top = -view.y / view.z - my;
     const near = layout.households.filter(
-      (hh) => hh.x + CARD_W > left && hh.x < left + 3 * mx && hh.y + CARD_H > top && hh.y < top + 3 * my,
+      (hh) => hh.x + width(hh) > left && hh.x < left + 3 * mx && hh.y + CARD_H > top && hh.y < top + 3 * my,
     );
     const isGhost = (hh: Household) => hh.members.some((id) => !this.people().has(id));
     let load = near.filter(isGhost);
@@ -215,7 +215,7 @@ export class HomePage {
       // the user is heading into unloaded tree, so load it; each load moves the
       // edge closer until the view fills. Empty space beside the tree loads nothing.
       const centre = { x: left + 1.5 * mx, y: top + 1.5 * my };
-      const distance = (hh: Household) => Math.hypot(hh.x + CARD_W / 2 - centre.x, hh.y + CARD_H / 2 - centre.y);
+      const distance = (hh: Household) => Math.hypot(hh.x + width(hh) / 2 - centre.x, hh.y + CARD_H / 2 - centre.y);
       const nearest = [...layout.households].sort((a, b) => distance(a) - distance(b))[0];
       load = nearest && isGhost(nearest) ? [nearest] : [];
     }
@@ -261,35 +261,13 @@ export class HomePage {
     return p.gender === 'male' ? m : p.gender === 'female' ? f : other;
   }
 
-  protected readonly portX = portX;
-
-  /** Stacked: the rest of the parents' line, down to the card behind (household coordinates). */
-  protected stubPath(i: number): string {
-    return `M${portX(i)},${-DROP} V${-i * STACK_OFFSET}`;
-  }
-
-  /** Fanned out: from above the stack across to the same card's spread-out position. */
-  protected spreadPath(i: number): string {
-    return `M${portX(i)},${-DROP} H${i * SPREAD_STEP + CARD_W / 2} V0`;
-  }
-
-  /** Stacked: from the bottom of the card behind down to the line to the children. */
-  protected downStubPath(i: number): string {
-    return `M${downX(i)},${CARD_H - i * STACK_OFFSET} V${CARD_H + DROP}`;
-  }
-
-  /** Fanned out: from the bottom of the spread-out card across to the line to the children. */
-  protected downSpreadPath(i: number): string {
-    return `M${i * SPREAD_STEP + CARD_W / 2},${CARD_H} V${CARD_H + DROP} H${downX(i)}`;
-  }
-
-  /** Fanned out: from partner `j`'s card to card `i`, at photo height, behind any cards between. */
+  /** From partner `j`'s card to card `i`, at photo height, behind any cards between. */
   protected marriagePath(j: number, i: number): string {
-    return `M${j * SPREAD_STEP + CARD_W},${HEART_Y} H${i * SPREAD_STEP}`;
+    return `M${j * SPOUSE_STEP + CARD_W},${HEART_Y} H${i * SPOUSE_STEP}`;
   }
 
   /**
-   * For a card behind the front one: 1 + the index of the nearest card before
+   * For a spouse's card: 1 + the index of the nearest card before
    * it that is their spouse (so 0 means none), for the marriage line and heart.
    */
   protected partnerIndex(h: Household, i: number): number {
@@ -301,9 +279,9 @@ export class HomePage {
     return 0;
   }
 
-  /** Center of a member's card (stacked, as drawn when not fanned out). */
+  /** Center of a member's card. */
   private cardCenter(h: Household, i: number): { x: number; y: number } {
-    return { x: h.x + i * STACK_OFFSET + CARD_W / 2, y: h.y - i * STACK_OFFSET + CARD_H / 2 };
+    return { x: h.x + cardMid(i), y: h.y + CARD_H / 2 };
   }
 
   /** Moves the view to the saved position once its person is laid out. */
@@ -453,8 +431,8 @@ export class HomePage {
   }
 
   /**
-   * Touch has no hover: the first tap on a stack fans it out and shows its
-   * buttons; tapping a card of an open stack shows the profile.
+   * Touch has no hover: the first tap on a household (a person and their
+   * spouses) shows its buttons; tapping a card of the open household shows the profile.
    */
   protected tapHousehold(id: string, e: PointerEvent): void {
     this.firstTap = e.pointerType !== 'mouse' && this.open() !== id;

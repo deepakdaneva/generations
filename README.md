@@ -76,31 +76,30 @@ reasoning behind these choices.
   or use the +/- buttons to zoom; the target button re-centers.
   - Hover or tap a card for its buttons: **+** on top adds a parent, left and
     right add a sibling on that side, bottom adds a child, the heart adds a
-    spouse. A new child or sibling also gets a birth order (1st, 2nd, ...);
+    spouse (only while the person isn't married to someone alive, so a widow
+    or widower can marry again). A new child or sibling also gets a birth order (1st, 2nd, ...);
     siblings are drawn eldest to youngest, left to right.
   - Lines connect parents to their children and are labelled (son, daughter
     or child; brother, sister or sibling for siblings without known parents).
   - Cards of men have a light blue tint, cards of women a light pink one.
     Gender is required when adding or editing a person.
-  - Spouses are stacked behind the card, the man's card in front, and fan
-    out on hover or tap; a spouse's parents connect to the spouse's own card
+  - Spouses' cards are side by side, the man's card first, joined by a line
+    with a beating heart. A spouse's parents connect to the spouse's own card
     and are placed on the spouse's side, outside the other partner's family.
-    Fanned out, a line with a beating heart joins the married couple.
   - A person with a date of death gets a mourning ribbon, a black-and-white
     photo and an "In loving memory · aged N" footer.
   - Adding a spouse offers **New person** or **Already in your tree**: pick
     someone already in the tree (search by name) to marry them, e.g. two
     brothers marrying two sisters. Their own parents, children, siblings and
-    spouses are not offered.
+    spouses, and anyone married to someone alive, are not offered.
   - Where lines of different families cross, the line underneath shows a
     small gap, so crossings don't look like joins. Hovering or tapping a
-    stack highlights the lines to its parents and children.
+    couple highlights the lines to their parents and children.
   - Your own card shows your profile picture until the card has photos of
     its own.
-  - Lines to children come from both parents' cards; in a stack, the line
-    from the card behind leaves from its visible edge (and from the card
-    itself once the stack fans out).
-  - Clicking a card (on touch: tapping a card of an open stack) opens the
+  - Lines to children come from both parents' cards.
+  - Clicking a card (on touch: a second tap, after the first shows its
+    buttons) opens the
     person's profile: photos, life dates, family (tap a relative to open
     theirs) and contact details, with an edit button.
   - The pencil edits name, dates of birth, death and anniversary, gender,
