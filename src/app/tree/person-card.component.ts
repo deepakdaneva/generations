@@ -467,7 +467,7 @@ export interface AddRequest {
 export class PersonCardComponent {
   readonly person = input.required<Person>();
   readonly canAddParent = input(true);
-  /** False while married to someone alive (a widow or widower can marry again). */
+  /** False for someone who has died or is married to someone alive (a widow or widower can marry again). */
   readonly canAddSpouse = input(true);
   readonly edit = output<void>();
   /** The card itself was clicked (not one of its buttons): show the profile. */

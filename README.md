@@ -76,8 +76,8 @@ reasoning behind these choices.
   or use the +/- buttons to zoom; the target button re-centers.
   - Hover or tap a card for its buttons: **+** on top adds a parent, left and
     right add a sibling on that side, bottom adds a child, the heart adds a
-    spouse (only while the person isn't married to someone alive, so a widow
-    or widower can marry again). A new child or sibling also gets a birth order (1st, 2nd, ...);
+    spouse (only for someone alive who isn't married to someone alive, so a
+    widow or widower can marry again). A new child or sibling also gets a birth order (1st, 2nd, ...);
     siblings are drawn eldest to youngest, left to right.
   - Lines connect parents to their children and are labelled (son, daughter
     or child; brother, sister or sibling for siblings without known parents).
@@ -88,10 +88,12 @@ reasoning behind these choices.
     and are placed on the spouse's side, outside the other partner's family.
   - A person with a date of death gets a mourning ribbon, a black-and-white
     photo and an "In loving memory · aged N" footer.
-  - Adding a spouse offers **New person** or **Already in your tree**: pick
-    someone already in the tree (search by name) to marry them, e.g. two
-    brothers marrying two sisters. Their own parents, children, siblings and
-    spouses, and anyone married to someone alive, are not offered.
+  - Adding a parent, sibling or child offers **New person** or **Already in
+    your tree**: pick someone already in the tree (search by name) one
+    generation up for a parent, in the same generation for a sibling, or one
+    down for a child. For example, when two brothers marry two sisters, add
+    the second sister as a new spouse, then link her to her father, who is
+    already in the tree. Only links that make sense are offered.
   - Where lines of different families cross, the line underneath shows a
     small gap, so crossings don't look like joins. Hovering or tapping a
     couple highlights the lines to their parents and children.

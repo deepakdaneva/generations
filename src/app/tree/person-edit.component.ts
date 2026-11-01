@@ -322,7 +322,7 @@ export class PersonEditComponent {
   readonly orderSlots = input(0);
   /** Preselected birth order (0 = eldest). */
   readonly orderDefault = input(0);
-  /** Adding a spouse: also offer someone already in the tree. */
+  /** Adding a parent, sibling or child: also offer someone already in the tree. */
   readonly linkable = input(false);
   /** People who can be picked (null while loading). */
   readonly candidates = input<{ id: string; name: string; hint: string }[] | null>(null);

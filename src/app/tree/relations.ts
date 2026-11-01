@@ -180,6 +180,7 @@ export function addRelative(
       break;
     }
     case 'spouse':
+      if (x.death) throw new RelationError(`${x.name} has died; no new spouse can be added.`);
       if (hasLivingSpouse(people, x.id)) throw new RelationError(`${x.name} is already married.`);
       p.spouses = [x.id];
       list(x, 'spouses').push(p.id);
@@ -189,38 +190,143 @@ export function addRelative(
 }
 
 /**
- * Marries two people already in the tree (e.g. two brothers marrying two
- * sisters). Not for someone already linked to them as spouse, parent, child
- * or sibling.
+ * Generation of everyone connected to `rootId`: 0 for them, -1 for parents,
+ * +1 for children, the same for spouses and siblings. The first path found
+ * wins if links disagree.
  */
-export function linkSpouse(people: People, a: string, b: string): Change {
-  if (a === b) throw new RelationError("Someone can't marry themselves.");
-  const pa = people.get(a);
-  const pb = people.get(b);
-  if (!pa || !pb) throw new RelationError('Unknown person');
-  for (const p of [pa, pb]) if (hasLivingSpouse(people, p.id)) throw new RelationError(`${p.name} is already married.`);
-  if (spouseCandidates(people, a).every((id) => id !== b))
+export function generations(people: People, rootId: string): Map<string, number> {
+  const gen = new Map([[rootId, 0]]);
+  const queue = [rootId];
+  for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+    const p = people.get(id);
+    const g = gen.get(id)!;
+    const next: [string[] | undefined, number][] = [
+      [p?.parents, -1],
+      [p?.children, 1],
+      [p?.spouses, 0],
+      [p?.siblings, 0],
+    ];
+    for (const [ids, step] of next) {
+      for (const n of ids ?? []) {
+        if (!gen.has(n) && people.has(n)) {
+          gen.set(n, g + step);
+          queue.push(n);
+        }
+      }
+    }
+  }
+  return gen;
+}
+
+export type LinkRelation = 'parent' | 'sibling' | 'child';
+
+/** Whether `to` is `from` or one of their descendants. */
+function descends(people: People, from: string, to: string): boolean {
+  const seen = new Set<string>();
+  const stack = [from];
+  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
+    if (id === to) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    stack.push(...(people.get(id)?.children ?? []));
+  }
+  return false;
+}
+
+/** Makes `parentId` a parent of `childId`, or of their whole sibling group when they have no parents. */
+function linkParent(d: Draft, people: People, childId: string, parentId: string): void {
+  const c = d.get(childId);
+  const parent = d.get(parentId);
+  const group = c.parents?.length ? [childId] : (c.siblings ?? [childId]);
+  for (const id of group) {
+    const m = d.get(id);
+    if (m.parents?.includes(parentId)) throw new RelationError(`${parent.name} is already a parent of ${m.name}.`);
+    if ((m.parents?.length ?? 0) >= 2) throw new RelationError(`${m.name} already has two parents.`);
+    const spouseParent = m.spouses?.some((sp) => people.get(sp)?.parents?.includes(parentId));
+    if (
+      descends(people, id, parentId) ||
+      m.spouses?.includes(parentId) ||
+      siblingsOf(people, id).includes(parentId) ||
+      spouseParent
+    )
+      throw new RelationError(`${parent.name} can't be a parent of ${m.name}.`);
+  }
+  for (const id of group) {
+    const m = d.get(id);
+    list(m, 'parents').push(parentId);
+    delete m.siblings;
+    if (!parent.children?.includes(id)) list(parent, 'children').push(id);
+  }
+}
+
+/**
+ * Makes `a` and `b` siblings. One of them may already belong to a family
+ * (parents or a sibling group); the other joins it, next to `a` on the
+ * `before` (left) or right side. Two families are never merged.
+ */
+function linkSibling(d: Draft, people: People, a: string, b: string, before = false): void {
+  const [pa, pb] = [d.get(a), d.get(b)];
+  if (siblingsOf(people, a).includes(b)) throw new RelationError(`${pb.name} is already a sibling of ${pa.name}.`);
+  if ([...(pa.parents ?? []), ...(pa.children ?? []), ...(pa.spouses ?? [])].includes(b))
     throw new RelationError(`${pb.name} is already related to ${pa.name}.`);
+  const hasFamily = (p: Person) => !!p.parents?.length || (p.siblings?.length ?? 0) > 1;
+  if (hasFamily(pa) && hasFamily(pb))
+    throw new RelationError(`${pa.name} and ${pb.name} both have their own families already.`);
+  // The one without a family joins the other's, on the requested side of `a`.
+  const [into, alone, left] = hasFamily(pb) ? [pb, pa, !before] : [pa, pb, before];
+  const order = siblingsOf(people, into.id);
+  const position = order.indexOf(into.id) + (left ? 0 : 1);
+  if (into.parents?.length) {
+    alone.parents = [...into.parents];
+    for (const id of into.parents) placeAt(list(d.get(id), 'children'), alone.id, order, position);
+  } else {
+    const group = [...order];
+    placeAt(group, alone.id, order, position);
+    for (const id of group) d.get(id).siblings = [...group];
+  }
+}
+
+/**
+ * Links `ofId` to `otherId`, someone already in the tree, as their parent,
+ * sibling or child. A child also gets `otherParent` (a spouse of `ofId`)
+ * when they have no other parent yet.
+ */
+export function linkRelative(
+  people: People,
+  ofId: string,
+  relation: LinkRelation,
+  otherId: string,
+  opts: { before?: boolean; otherParent?: string } = {},
+): Change {
+  if (ofId === otherId) throw new RelationError("Someone can't be their own relative.");
+  if (!people.has(ofId) || !people.has(otherId)) throw new RelationError('Unknown person');
   const d = new Draft(people);
-  list(d.get(a), 'spouses').push(b);
-  list(d.get(b), 'spouses').push(a);
+  if (relation === 'parent') linkParent(d, people, ofId, otherId);
+  else if (relation === 'child') {
+    const hadParents = !!people.get(otherId)!.parents?.length;
+    linkParent(d, people, otherId, ofId);
+    if (opts.otherParent && !hadParents) linkParent(d, d.view(), otherId, opts.otherParent);
+  } else linkSibling(d, people, ofId, otherId, opts.before);
   return d.result();
 }
 
 /**
- * People who can be linked as `id`'s spouse: everyone except them, their
- * spouses, parents, children and siblings, and anyone married to someone alive.
+ * People already in the tree who can be linked as `relation` of `ofId`: one
+ * generation above for a parent, the same for a sibling, one below for a
+ * child, and only where the link is allowed (see linkRelative).
  */
-export function spouseCandidates(people: People, id: string): string[] {
-  const p = people.get(id);
-  const close = new Set([
-    id,
-    ...(p?.spouses ?? []),
-    ...(p?.parents ?? []),
-    ...(p?.children ?? []),
-    ...siblingsOf(people, id),
-  ]);
-  return [...people.keys()].filter((x) => !close.has(x) && !hasLivingSpouse(people, x));
+export function linkCandidates(people: People, rootId: string, ofId: string, relation: LinkRelation): string[] {
+  const gen = generations(people, rootId);
+  const target = gen.get(ofId)! + { parent: -1, sibling: 0, child: 1 }[relation];
+  return [...people.keys()].filter((id) => {
+    if (id === ofId || gen.get(id) !== target) return false;
+    try {
+      linkRelative(people, ofId, relation, id);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 }
 
 /** Removes every link between `a` and `b` from both; if they are in a sibling group, `b` leaves it. */

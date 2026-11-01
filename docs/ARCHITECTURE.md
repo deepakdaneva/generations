@@ -181,12 +181,18 @@ of a home-made algorithm. It is the only new runtime dependency.
   places them on that side. Lines to children leave from each parent's
   bottom port, so a child's line comes from both parents. A marriage line
   with a beating heart joins spouses at photo height.
-- A new spouse can only be added to someone not married to anyone alive
-  (no date of death): a widow or widower can marry again. The form enforces
+- A new spouse can only be added to someone alive who is not married to
+  anyone alive (no date of death): a widow or widower can marry again. The form enforces
   this (the heart button is hidden), not the security rules.
-- Two people already in the tree can be married (`linkSpouse`, e.g. two
-  brothers marrying two sisters); each keeps the line from their own parents,
-  so lines of different families can cross. Lines are drawn per family, each
+- Someone already in the tree can be linked as a parent, sibling or child
+  (`linkRelative`). Candidates come from generations counted from the user's
+  card (`generations`: parents -1, children +1, spouses and siblings the
+  same): one up for a parent, the same for a sibling, one down for a child,
+  and only where the link is allowed (no cycles, at most two parents, not a
+  spouse's parent, a sibling joins only someone without a family of their
+  own). A sibling without parents brings their whole sibling group along. So
+  when two brothers marry two sisters, each sister keeps the line from her own
+  parents, and lines of different families can cross. Lines are drawn per family, each
   over a wider band in the background colour: a later family's line crossing
   an earlier one leaves a gap in it, while lines of one family still join.
   Hovering or tapping a couple highlights the families they belong to.

@@ -39,7 +39,15 @@ import {
 import { PersonCardComponent, type AddRequest } from '../tree/person-card.component';
 import { PersonEditComponent, type PersonForm } from '../tree/person-edit.component';
 import { PersonProfileComponent } from '../tree/person-profile.component';
-import { childrenOf, hasLivingSpouse, pathTo, RelationError, siblingsOf, spouseCandidates } from '../tree/relations';
+import {
+  childrenOf,
+  hasLivingSpouse,
+  linkCandidates,
+  pathTo,
+  RelationError,
+  siblingsOf,
+  type LinkRelation,
+} from '../tree/relations';
 import { TreeService, type Person, type SavedView } from '../tree/tree.service';
 import { zoomAt, type View } from '../tree/view';
 
@@ -60,8 +68,8 @@ interface Form {
   /** Birth-order choice for a new child or sibling: positions offered and the preselected one. */
   orderSlots?: number;
   orderDefault?: number;
-  /** Adding a spouse of this person: someone already in the tree can be picked instead. */
-  spouseOf?: string;
+  /** Adding a parent, sibling or child: someone already in the tree can be picked instead. */
+  link?: { of: string; relation: LinkRelation; before?: boolean; otherParent?: string };
   submit: (details: PersonForm) => Promise<unknown>;
 }
 
@@ -487,7 +495,8 @@ export class HomePage {
       canDelete: false,
       orderSlots,
       orderDefault,
-      spouseOf: req.relation === 'spouse' ? of.id : undefined,
+      link:
+        req.relation === 'spouse' ? undefined : { of: of.id, relation: req.relation, before: req.before, otherParent },
       submit: (details) =>
         this.tree.add(of.id, req.relation, details, { otherParent, position: orderSlots ? details.order : undefined }),
     });
@@ -499,13 +508,13 @@ export class HomePage {
     if (await this.run(() => form.submit(details))) this.closeForm();
   }
 
-  /** "Already in your tree": everyone who could be the spouse, with who their parents are. */
+  /** "Already in your tree": people one generation up (parent), the same (sibling) or one down (child), with their parents. */
   async findExisting(): Promise<void> {
-    const of = this.form()?.spouseOf;
-    if (!of || !(await this.run(() => this.tree.loadAll()))) return;
+    const link = this.form()?.link;
+    if (!link || !(await this.run(() => this.tree.loadAll()))) return;
     const people = this.people();
     this.candidates.set(
-      spouseCandidates(people, of)
+      linkCandidates(people, this.tree.rootId, link.of, link.relation)
         .map((id) => {
           const p = people.get(id)!;
           const parents = (p.parents ?? []).map((x) => people.get(x)?.name).filter(Boolean);
@@ -516,9 +525,9 @@ export class HomePage {
     );
   }
 
-  async linkSpouse(id: string): Promise<void> {
-    const of = this.form()?.spouseOf;
-    if (of && (await this.run(() => this.tree.linkSpouse(of, id)))) this.closeForm();
+  async linkExisting(id: string): Promise<void> {
+    const link = this.form()?.link;
+    if (link && (await this.run(() => this.tree.linkRelative(link.of, link.relation, id, link)))) this.closeForm();
   }
 
   async unlink(otherId: string): Promise<void> {
