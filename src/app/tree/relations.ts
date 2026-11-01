@@ -58,11 +58,36 @@ class Draft {
 
 const list = (p: Person, key: (typeof LINKS)[number]) => (p[key] ??= []);
 
-/** Inserts `id` next to `anchor` (before or after it), or at the end. */
-function insertNear(ids: string[], id: string, anchor: string, before: boolean): void {
-  const i = ids.indexOf(anchor);
-  if (i < 0) ids.push(id);
-  else ids.splice(before ? i : i + 1, 0, id);
+/**
+ * Inserts `id` at birth-order `position` of the siblings in `order`, placing it
+ * in `ids` (a parent's children, which may also hold half-siblings) right
+ * before the sibling now at that position, or after the youngest.
+ */
+function placeAt(ids: string[], id: string, order: string[], position: number): void {
+  const next = order[position];
+  if (next !== undefined && ids.includes(next)) return void ids.splice(ids.indexOf(next), 0, id);
+  const youngest = order.filter((o) => ids.includes(o)).pop();
+  if (youngest === undefined) ids.push(id);
+  else ids.splice(ids.indexOf(youngest) + 1, 0, id);
+}
+
+/**
+ * Children of exactly these parents, eldest first (the order of the first
+ * parent's `children`). Half-siblings belong to another set of parents.
+ */
+export function childrenOf(people: People, parents: string[]): string[] {
+  const set = new Set(parents);
+  return (people.get(parents[0])?.children ?? []).filter((c) => {
+    const own = people.get(c)?.parents ?? [];
+    return own.length === set.size && own.every((x) => set.has(x));
+  });
+}
+
+/** The person's full siblings including themselves, eldest first. */
+export function siblingsOf(people: People, id: string): string[] {
+  const p = people.get(id);
+  if (!p) return [id];
+  return p.parents?.length ? childrenOf(people, p.parents) : (p.siblings ?? [id]);
 }
 
 /** Everyone linked to `id` in any way. */
@@ -87,14 +112,18 @@ export function reachable(people: People, rootId: string): Set<string> {
 
 /**
  * Adds `person` (a new id with details) as `relation` of `ofId`.
- * `before` puts a sibling to the left; `otherParent` is the second parent of a new child.
+ * `otherParent` is the second parent of a new child. For children and
+ * siblings, `position` is their birth order among their full siblings
+ * (0 = eldest; siblings are drawn eldest to youngest, left to right). Without
+ * it a child is the youngest and a sibling goes right after `ofId`, or right
+ * before when `before` is set.
  */
 export function addRelative(
   people: People,
   ofId: string,
   relation: Relation,
   person: Person,
-  opts: { before?: boolean; otherParent?: string } = {},
+  opts: { before?: boolean; otherParent?: string; position?: number } = {},
 ): Change {
   const d = new Draft(people);
   const x = d.get(ofId);
@@ -122,22 +151,22 @@ export function addRelative(
       break;
     }
     case 'child': {
-      p.parents = [x.id];
-      list(x, 'children').push(p.id);
-      if (opts.otherParent) {
-        if (!x.spouses?.includes(opts.otherParent)) throw new RelationError('The other parent must be a spouse.');
-        p.parents.push(opts.otherParent);
-        list(d.get(opts.otherParent), 'children').push(p.id);
-      }
+      if (opts.otherParent && !x.spouses?.includes(opts.otherParent))
+        throw new RelationError('The other parent must be a spouse.');
+      p.parents = opts.otherParent ? [x.id, opts.otherParent] : [x.id];
+      const order = childrenOf(people, p.parents);
+      for (const id of p.parents) placeAt(list(d.get(id), 'children'), p.id, order, opts.position ?? order.length);
       break;
     }
     case 'sibling': {
+      const order = siblingsOf(people, x.id);
+      const position = opts.position ?? order.indexOf(x.id) + (opts.before ? 0 : 1);
       if (x.parents?.length) {
         p.parents = [...x.parents];
-        for (const id of x.parents) insertNear(list(d.get(id), 'children'), p.id, x.id, !!opts.before);
+        for (const id of x.parents) placeAt(list(d.get(id), 'children'), p.id, order, position);
       } else {
-        const group = [...(x.siblings ?? [x.id])];
-        insertNear(group, p.id, x.id, !!opts.before);
+        const group = [...order];
+        placeAt(group, p.id, order, position);
         for (const id of group) (id === p.id ? p : d.get(id)).siblings = [...group];
       }
       break;

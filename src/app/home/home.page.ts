@@ -27,16 +27,18 @@ import { TopActionsComponent } from '../shared/top-actions.component';
 import {
   CARD_H,
   CARD_W,
+  DROP,
   layoutTree,
+  SPREAD_STEP,
   STACK_OFFSET,
   withPlaceholders,
   type Household,
   type Layout,
 } from '../tree/layout';
 import { PersonCardComponent, type AddRequest } from '../tree/person-card.component';
-import { PersonEditComponent } from '../tree/person-edit.component';
-import { neighbors, pathTo, RelationError } from '../tree/relations';
-import { TreeService, type Person, type PersonDetails, type SavedView } from '../tree/tree.service';
+import { PersonEditComponent, type PersonForm } from '../tree/person-edit.component';
+import { childrenOf, neighbors, pathTo, RelationError, siblingsOf } from '../tree/relations';
+import { TreeService, type Person, type SavedView } from '../tree/tree.service';
 import { zoomAt, type View } from '../tree/view';
 
 type Point = { x: number; y: number };
@@ -49,7 +51,10 @@ interface Form {
   title: string;
   relations: { id: string; name: string; label: string }[];
   canDelete: boolean;
-  submit: (details: PersonDetails) => Promise<unknown>;
+  /** Birth-order choice for a new child or sibling: positions offered and the preselected one. */
+  orderSlots?: number;
+  orderDefault?: number;
+  submit: (details: PersonForm) => Promise<unknown>;
 }
 
 /** Home: the family-tree canvas, centered on the user's own card. */
@@ -163,10 +168,22 @@ export class HomePage {
     const [mx, my] = [w / view.z, h / view.z];
     const left = -view.x / view.z - mx;
     const top = -view.y / view.z - my;
-    const ids = layout.households
-      .filter((hh) => hh.x + CARD_W > left && hh.x < left + 3 * mx && hh.y + CARD_H > top && hh.y < top + 3 * my)
-      .flatMap((hh) => hh.members)
-      .filter((id) => !this.people().has(id));
+    const near = layout.households.filter(
+      (hh) => hh.x + CARD_W > left && hh.x < left + 3 * mx && hh.y + CARD_H > top && hh.y < top + 3 * my,
+    );
+    const isGhost = (hh: Household) => hh.members.some((id) => !this.people().has(id));
+    let load = near.filter(isGhost);
+    if (!near.length) {
+      // Panned past everything loaded (e.g. quickly, far up a long line of
+      // ancestors): if the nearest placeholder is closer than any loaded card,
+      // the user is heading into unloaded tree, so load it; each load moves the
+      // edge closer until the view fills. Empty space beside the tree loads nothing.
+      const centre = { x: left + 1.5 * mx, y: top + 1.5 * my };
+      const distance = (hh: Household) => Math.hypot(hh.x + CARD_W / 2 - centre.x, hh.y + CARD_H / 2 - centre.y);
+      const nearest = [...layout.households].sort((a, b) => distance(a) - distance(b))[0];
+      load = nearest && isGhost(nearest) ? [nearest] : [];
+    }
+    const ids = load.flatMap((hh) => hh.members).filter((id) => !this.people().has(id));
     if (ids.length) void this.tree.loadMore(ids).catch(() => undefined); // retried on the next pan
   }
 
@@ -198,6 +215,23 @@ export class HomePage {
   center(): void {
     const { clientWidth, clientHeight } = this.canvas().nativeElement;
     this.view.set({ x: clientWidth / 2, y: clientHeight / 2, z: 1 });
+  }
+
+  /** How a person is related to the line above their card: son, daughter, sister, ... */
+  protected relationLabel(id: string): string | null {
+    const p = this.people().get(id);
+    if (!p) return null;
+    const [m, f, other] = p.parents?.length ? ['Son', 'Daughter', 'Child'] : ['Brother', 'Sister', 'Sibling'];
+    return p.gender === 'male' ? m : p.gender === 'female' ? f : other;
+  }
+
+  /**
+   * Fanned-out stack: from where the parents' line reaches the stacked card,
+   * across to the same card's spread-out position (household coordinates).
+   */
+  protected spreadPath(i: number): string {
+    const stacked = i * STACK_OFFSET + CARD_W / 2;
+    return `M${stacked},${-DROP} H${i * SPREAD_STEP + CARD_W / 2} V0`;
   }
 
   /** Center of a member's card (stacked, as drawn when not fanned out). */
@@ -255,7 +289,11 @@ export class HomePage {
   private flushView(): void {
     clearTimeout(this.saveTimer);
     const layout = this.layout();
-    if (layout) this.saveView(this.view(), layout);
+    try {
+      if (layout) this.saveView(this.view(), layout);
+    } catch {
+      // Leaving because of sign-out: the session is gone, nothing to save.
+    }
   }
 
   zoomBy(factor: number): void {
@@ -351,17 +389,35 @@ export class HomePage {
       if (choice === undefined) return;
       otherParent = choice || undefined;
     }
-    const label = req.relation === 'sibling' ? `sibling (${req.before ? 'left' : 'right'})` : req.relation;
+    // Birth order: offer every position among the full siblings; preselect the
+    // side of the button that was used (siblings) or youngest (children).
+    let orderSlots = 0;
+    let orderDefault = 0;
+    if (req.relation === 'child' || req.relation === 'sibling') {
+      if (!(await this.run(() => this.tree.loadFamily(of.id)))) return;
+      const people = this.people();
+      if (req.relation === 'child') {
+        orderSlots = childrenOf(people, otherParent ? [of.id, otherParent] : [of.id]).length + 1;
+        orderDefault = orderSlots - 1;
+      } else {
+        const siblings = siblingsOf(people, of.id);
+        orderSlots = siblings.length + 1;
+        orderDefault = siblings.indexOf(of.id) + (req.before ? 0 : 1);
+      }
+    }
     this.form.set({
       person: { id: '', name: '' },
-      title: `Add ${label} of ${of.name}`,
+      title: `Add ${req.relation} of ${of.name}`,
       relations: [],
       canDelete: false,
-      submit: (details) => this.tree.add(of.id, req.relation, details, { before: req.before, otherParent }),
+      orderSlots,
+      orderDefault,
+      submit: (details) =>
+        this.tree.add(of.id, req.relation, details, { otherParent, position: orderSlots ? details.order : undefined }),
     });
   }
 
-  async save(details: PersonDetails): Promise<void> {
+  async save(details: PersonForm): Promise<void> {
     const form = this.form();
     if (!form) return;
     if (await this.run(() => form.submit(details))) this.closeForm();

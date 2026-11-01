@@ -239,13 +239,22 @@ export class TreeService {
     ofId: string,
     relation: Relation,
     details: PersonDetails,
-    opts: { before?: boolean; otherParent?: string } = {},
+    opts: { before?: boolean; otherParent?: string; position?: number } = {},
   ): Promise<string> {
     const id = doc(this.peopleCol()).id;
-    // The change also rewrites the person's relatives (e.g. a parent's children), so they must be loaded.
-    await this.loadMore(neighbors(this.people().get(ofId)!));
+    await this.loadFamily(ofId);
     await this.commit(addRelative(this.people(), ofId, relation, { id, ...cleanDetails(details) }, opts));
     return id;
+  }
+
+  /**
+   * Loads a person's relatives and their siblings. Adding a relative rewrites
+   * them (e.g. a parent's children) and needs the siblings' birth order.
+   */
+  async loadFamily(id: string): Promise<void> {
+    await this.loadMore(neighbors(this.people().get(id)!));
+    const parents = this.people().get(id)?.parents ?? [];
+    await this.loadMore(parents.flatMap((p) => this.people().get(p)?.children ?? []));
   }
 
   async unlink(a: string, b: string): Promise<void> {

@@ -30,7 +30,15 @@
         [style.transform]="'translate(' + h.x + 'px, ' + h.y + 'px)'"
         (pointerdown)="open.set(h.id)"
       >
-        @for (id of h.members; track id; let i = $index) { @if (people().get(id); as person) {
+        <!-- When the stack fans out, the parents' line continues to the spouse's card. -->
+        <svg class="spread-lines" aria-hidden="true">
+          @for (id of h.members; track id; let i = $index) { @if (i > 0 && h.linked[i]) {
+          <path [attr.d]="spreadPath(i)"></path>
+          } }
+        </svg>
+        @for (id of h.members; track id; let i = $index) { @if (h.linked[i] && relationLabel(id); as label) {
+        <span class="relation" [class.back]="i > 0" [style.--i]="i">{{ label }}</span>
+        } } @for (id of h.members; track id; let i = $index) { @if (people().get(id); as person) {
         <app-person-card
           class="node"
           [class.active]="open() === h.id"
@@ -91,6 +99,8 @@
     [title]="form()?.title ?? ''"
     [relations]="form()?.relations ?? []"
     [canDelete]="!!form()?.canDelete"
+    [orderSlots]="form()?.orderSlots ?? 0"
+    [orderDefault]="form()?.orderDefault ?? 0"
     [busy]="saving()"
     [error]="saveError()"
     (save)="save($event)"

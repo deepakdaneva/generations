@@ -44,7 +44,7 @@ export interface AddRequest {
   imports: [DatePipe, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon, IonSpinner],
   host: { '[style.width.px]': 'width', '[style.height.px]': 'height' },
   template: `
-    <ion-card class="person">
+    <ion-card class="person" [class.male]="person().gender === 'male'" [class.female]="person().gender === 'female'">
       <ion-button
         class="edit"
         fill="clear"
@@ -220,6 +220,17 @@ export interface AddRequest {
       transition:
         transform 0.2s ease,
         box-shadow 0.2s ease;
+    }
+    /* A light blue or pink wash over the normal card colour (works in light and dark mode). */
+    .person.male {
+      --background:
+        linear-gradient(rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.1)),
+        var(--ion-card-background, var(--ion-item-background, var(--ion-background-color, #fff)));
+    }
+    .person.female {
+      --background:
+        linear-gradient(rgba(219, 39, 119, 0.1), rgba(219, 39, 119, 0.1)),
+        var(--ion-card-background, var(--ion-item-background, var(--ion-background-color, #fff)));
     }
     :host(:hover) .person {
       transform: perspective(800px) rotateX(3deg) translateY(-3px);

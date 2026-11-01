@@ -69,8 +69,15 @@ reasoning behind these choices.
   or use the +/- buttons to zoom; the target button re-centers.
   - Hover or tap a card for its buttons: **+** on top adds a parent, left and
     right add a sibling on that side, bottom adds a child, the heart adds a
-    spouse. Lines connect parents to their children.
-  - Spouses are stacked behind the card and fan out on hover or tap.
+    spouse. A new child or sibling also gets a birth order (1st, 2nd, ...);
+    siblings are drawn eldest to youngest, left to right.
+  - Lines connect parents to their children and are labelled (son, daughter
+    or child; brother, sister or sibling for siblings without known parents).
+  - Cards of men have a light blue tint, cards of women a light pink one.
+    Gender is required when adding or editing a person.
+  - Spouses are stacked behind the card and fan out on hover or tap; a
+    spouse's parents connect to the spouse's own card and are placed on the
+    spouse's side, outside the other partner's family.
   - The pencil edits name, dates of birth, death and anniversary, gender,
     email, place/address and up to 10 social links. It also lists the
     person's relationships to remove one, and deletes the person (anyone

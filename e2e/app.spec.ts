@@ -42,6 +42,14 @@ async function freshUser(displayName: string): Promise<string> {
   return email;
 }
 
+/** Picks an option of an ion-select (popover interface) in the open modal. */
+async function choose(page: Page, control: string, option: string) {
+  await page.locator(`ion-modal ion-select[formcontrolname=${control}]`).click();
+  const popover = page.locator('ion-popover.select-popover');
+  await popover.getByRole('radio', { name: option, exact: true }).click();
+  await expect(popover).toHaveCount(0);
+}
+
 /** The signed-in user's own card on the home canvas. */
 const ownCard = (page: Page, name: string) => page.locator('app-person-card ion-card-title', { hasText: name });
 
@@ -349,8 +357,13 @@ test('family tree: own card can be edited and the canvas panned and zoomed', asy
   await modal.locator('ion-input[formcontrolname=birth] input').fill('1990-04-01');
   await modal.getByRole('button', { name: 'Add link' }).click();
   await modal.locator('ion-input[formcontrolname=value] input').fill('@ada');
+  // Gender is required: it decides the card's tint and the relationship labels.
+  await modal.getByRole('button', { name: 'Save' }).click();
+  await expect(modal.getByText('Choose a gender')).toBeVisible();
+  await choose(page, 'gender', 'Female');
   await modal.getByRole('button', { name: 'Save' }).click();
   await expect(ownCard(page, 'Ada Admin')).toBeVisible();
+  await expect(card.locator('ion-card.female')).toHaveCount(1); // pink tint
   await expect(card).toContainText('Instagram: @ada');
 
   // Saved in Firestore: still there after a reload.
@@ -400,17 +413,24 @@ test('family tree: add relatives, remove a relationship and delete a person', as
     for (let i = 0; i < Math.abs(dy); i++) await canvas.press(dy > 0 ? 'ArrowUp' : 'ArrowDown');
   }
   /** Opens a card's buttons (tap), clicks one, fills the name and saves. */
-  async function addRelative(of: string, button: string, name: string) {
+  async function addRelative(of: string, button: string, name: string, gender = 'Male') {
     await bringIntoView(of);
     await card(of)
       .locator('ion-card')
       .click({ position: { x: 20, y: 200 } });
     await page.getByRole('button', { name: `${button} ${of}` }).click();
     await modal.locator('ion-input[formcontrolname=name] input').fill(name);
+    await choose(page, 'gender', gender);
     await modal.getByRole('button', { name: 'Save' }).click();
     await expect(card(name)).toBeVisible();
     await expect(modal.locator('form')).toHaveCount(0); // closed, so the canvas gets the keys again
   }
+  /** The relationship label on the line above a card. */
+  const label = (name: string) =>
+    page
+      .locator('.household', { has: card(name) })
+      .locator('.relation')
+      .first();
 
   await expect(card('Ada Admin')).toBeVisible();
   await addRelative('Ada Admin', 'Add parent of', 'Father');
@@ -423,9 +443,12 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await page.getByRole('button', { name: 'Add child of Ada Admin' }).click();
   await page.locator('ion-alert').getByRole('button', { name: 'OK' }).click();
   await modal.locator('ion-input[formcontrolname=name] input').fill('Kid');
+  await choose(page, 'gender', 'Male');
   await modal.getByRole('button', { name: 'Save' }).click();
   await expect(card('Kid')).toBeVisible();
   await expect(modal.locator('form')).toHaveCount(0);
+  await expect(card('Kid').locator('ion-card.male')).toHaveCount(1); // blue tint
+  await expect(label('Kid')).toHaveText('Son');
   await addRelative('Father', 'Add parent of', 'Grandfather');
 
   // Parents are drawn above, children below, joined by lines.
@@ -433,6 +456,23 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   expect(await y('Father')).toBeLessThan(await y('Ada Admin'));
   expect(await y('Kid')).toBeGreaterThan(await y('Ada Admin'));
   await expect(page.locator('.lines path')).toHaveCount(6);
+
+  // Birth order: a new eldest child is drawn left of the younger one.
+  await bringIntoView('Ada Admin');
+  await card('Ada Admin')
+    .locator('ion-card')
+    .click({ position: { x: 20, y: 200 } });
+  await page.getByRole('button', { name: 'Add child of Ada Admin' }).click();
+  await page.locator('ion-alert').getByRole('button', { name: 'OK' }).click();
+  await modal.locator('ion-input[formcontrolname=name] input').fill('Elder');
+  await choose(page, 'gender', 'Female');
+  await choose(page, 'order', '1st child (eldest)');
+  await modal.getByRole('button', { name: 'Save' }).click();
+  await expect(card('Elder')).toBeVisible();
+  await expect(modal.locator('form')).toHaveCount(0);
+  await expect(label('Elder')).toHaveText('Daughter');
+  const x = async (name: string) => (await card(name).boundingBox())!.x;
+  await expect.poll(async () => (await x('Elder')) < (await x('Kid'))).toBe(true);
 
   // Saved: the same tree after a reload.
   await page.reload();
@@ -529,12 +569,13 @@ test('family tree: loads the nearest 10 people first, then more while exploring'
   await expect(cards).toHaveCount(10);
   await expect(page.locator('.ghost')).toHaveCount(1);
 
-  // Zooming out brings more of the tree near the screen, so more loads.
+  // Zooming out and moving up brings more of the tree near the screen, so more loads.
   for (let i = 0; i < 6; i++) await page.getByRole('button', { name: 'Zoom out' }).click();
-  await expect.poll(() => cards.count()).toBeGreaterThan(10);
-  // Panning up reaches the oldest generation.
   const canvas = page.locator('.tree-canvas');
-  for (let i = 0; i < 40; i++) await canvas.press('ArrowUp');
+  for (let i = 0; i < 10; i++) await canvas.press('ArrowUp');
+  await expect.poll(() => cards.count()).toBeGreaterThan(10);
+  // Panning further up reaches the oldest generation.
+  for (let i = 0; i < 50; i++) await canvas.press('ArrowUp');
   await expect(page.getByRole('heading', { name: 'Ancestor 20', exact: true })).toBeAttached();
 
   // Deleting checks the whole tree, so the warning names everyone who would go.
