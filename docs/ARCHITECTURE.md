@@ -262,6 +262,24 @@ removing a photo updates the person's `photos` list in the same batch write;
 deleting a person deletes their photos too. At five 40 KB photos per person
 the free 1 GiB holds roughly 5,000 fully photographed people.
 
+**Loading.** The canvas never reads the whole tree up front
+(`src/app/tree/tree.service.ts`):
+
+- On opening, it reads the user's own card and then the nearest relatives,
+  breadth-first, until 10 people are loaded (one `in` query per generation,
+  at most 30 ids each; Firestore bills one read per document).
+- Relatives linked from loaded people but not loaded yet become placeholders
+  in the layout (`withPlaceholders()` in `layout.ts`), so ELK keeps their place
+  and the canvas shows a skeleton card there. Whenever the view moves, the
+  placeholders on screen or within one screen of it are loaded (150 ms after
+  the movement stops); new cards fade in over their placeholder.
+- Adding a relative first loads the person's direct relatives, because the
+  change rewrites them too. Removing a relationship or deleting a person
+  first loads the whole tree once per session, because only the whole tree
+  shows who would be cut off.
+- Links to documents that no longer exist (deleted on another device) are
+  hidden instead of being retried.
+
 Relationship changes (`src/app/tree/relations.ts`) are pure functions that
 return every person to rewrite; the app saves them in one batch write, so
 both sides of a link always change together. The tree stays connected to the

@@ -198,6 +198,12 @@ export interface AddRequest {
     :host {
       display: block;
       position: relative;
+      animation: appear 0.3s ease-out; /* smooth swap from the loading placeholder */
+    }
+    @keyframes appear {
+      from {
+        opacity: 0;
+      }
     }
     .person {
       position: relative;
@@ -223,6 +229,9 @@ export interface AddRequest {
         0 28px 48px rgba(0, 0, 0, 0.16);
     }
     @media (prefers-reduced-motion: reduce) {
+      :host {
+        animation: none;
+      }
       .person,
       :host(:hover) .person {
         transition: none;

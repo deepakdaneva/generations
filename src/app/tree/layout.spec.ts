@@ -1,4 +1,4 @@
-import { CARD_H, CARD_W, households, layoutTree, roundedPath } from './layout';
+import { CARD_H, CARD_W, households, layoutTree, roundedPath, withPlaceholders } from './layout';
 import type { Person } from './tree.service';
 
 const people = new Map<string, Person>(
@@ -29,6 +29,16 @@ describe('family layout', () => {
     expect(x('me') + CARD_W / 2).toBe(0);
     expect(y('me') + CARD_H / 2).toBe(0);
     expect(lines.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('adds placeholders for unloaded relatives, linked back to the loaded people', async () => {
+    const loaded = new Map([...people].filter(([id]) => ['me', 'wife', 'kid'].includes(id)));
+    const all = withPlaceholders(loaded, new Set(['dad', 'mum']));
+    expect(all.get('dad')).toEqual({ id: 'dad', name: '', children: ['me'] });
+    expect(all.get('mum')!.children).toEqual(['me']);
+    expect(all.has('sis')).toBe(false); // not linked from anyone loaded
+    const { households: hs } = await layoutTree(all, 'me');
+    expect(hs.find((h) => h.members.includes('dad'))!.y).toBeLessThan(0);
   });
 
   it('rounds corners of orthogonal paths', () => {

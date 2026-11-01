@@ -74,8 +74,10 @@ reasoning behind these choices.
   - Up to 5 photos per person: "+ add" on the photo circle, arrows to browse,
     the bin to remove. Photos are shrunk in the browser (longest side 480 px,
     about 10-40 KB each) before they are saved.
-  - Lazy loading, the "remember position" setting and encryption follow in
-    later steps.
+  - Large trees open fast: only your card and the 10 nearest people load
+    first. Relatives further away show as placeholder cards and load in the
+    background as you pan or zoom towards them.
+  - The "remember position" setting and encryption follow in later steps.
 - **Installable app (PWA):** add it to the home screen on Android, iOS or
   desktop; it opens full screen, starts offline, and offers a reload when a new
   version is deployed.

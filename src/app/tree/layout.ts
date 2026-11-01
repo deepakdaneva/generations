@@ -1,6 +1,7 @@
 import type { ElkExtendedEdge, ElkNode, ElkPoint } from 'elkjs/lib/elk-api';
 
 import type { People } from './relations';
+import type { Person } from './tree.service';
 
 /** Cards have a fixed size so the layout never waits for rendering. */
 export const CARD_W = 260;
@@ -27,6 +28,29 @@ export interface Line {
 export interface Layout {
   households: Household[];
   lines: Line[];
+}
+
+/**
+ * Adds a placeholder for every linked person not loaded yet, with the links
+ * back to the loaded people, so the layout keeps their place and the canvas
+ * can show a skeleton card there until they load.
+ */
+export function withPlaceholders(people: People, unloaded: ReadonlySet<string>): People {
+  if (!unloaded.size) return people;
+  const all = new Map(people);
+  const ghost = (id: string) => {
+    let g: Person | undefined = all.get(id);
+    if (!g) all.set(id, (g = { id, name: '' }));
+    return g;
+  };
+  const back = { parents: 'children', children: 'parents', spouses: 'spouses' } as const;
+  for (const p of people.values()) {
+    for (const key of ['parents', 'children', 'spouses'] as const) {
+      for (const id of p[key] ?? []) if (unloaded.has(id)) (ghost(id)[back[key]] ??= []).push(p.id);
+    }
+    for (const id of p.siblings ?? []) if (unloaded.has(id)) ghost(id).siblings = p.siblings;
+  }
+  return all;
 }
 
 /** Spouses (and spouses of spouses) form one household; ordered breadth-first from the root. */

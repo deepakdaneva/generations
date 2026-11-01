@@ -41,6 +41,22 @@
           (edit)="startEdit(person)"
           (add)="startAdd(person, $event)"
         ></app-person-card>
+        } @else {
+        <!-- Placeholder while this relative loads. -->
+        <div
+          class="node ghost"
+          [style.--i]="i"
+          [style.z-index]="h.members.length - i"
+          [style.width.px]="cardWidth"
+          [style.height.px]="cardHeight"
+          aria-hidden="true"
+        >
+          <ion-card>
+            <ion-skeleton-text [animated]="true" class="ghost-photo"></ion-skeleton-text>
+            <ion-skeleton-text [animated]="true" class="ghost-line"></ion-skeleton-text>
+            <ion-skeleton-text [animated]="true" class="ghost-line short"></ion-skeleton-text>
+          </ion-card>
+        </div>
         } }
       </div>
       }

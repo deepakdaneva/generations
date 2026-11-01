@@ -460,3 +460,54 @@ test('family tree: up to 5 photos per person, browsed with arrows and removable'
   await expect(me.locator('.dots span')).toHaveCount(4);
   await expect(me.getByRole('button', { name: 'Add photo of Ada Admin' })).toBeVisible();
 });
+
+test('family tree: loads the nearest 10 people first, then more while exploring', async ({ page }) => {
+  // Seed 20 generations of ancestors above the test user's own card.
+  const { localId: uid } = await lookup('user@generations.test');
+  const base = 'http://127.0.0.1:8080/v1/projects/demo-generations/databases/(default)/documents';
+  const headers = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
+  const ids = (list: string[]) => ({ arrayValue: { values: list.map((stringValue) => ({ stringValue })) } });
+  const put = (id: string, fields: Record<string, unknown>, mask = '') =>
+    fetch(`${base}/trees/${uid}/people/${id}${mask}`, { method: 'PATCH', headers, body: JSON.stringify({ fields }) });
+  await put(
+    uid,
+    {
+      name: { stringValue: 'Test User' },
+      parents: ids(['a1']),
+      updatedAt: { timestampValue: new Date().toISOString() },
+    },
+    '?updateMask.fieldPaths=name&updateMask.fieldPaths=parents&updateMask.fieldPaths=updatedAt',
+  );
+  for (let i = 1; i <= 20; i++) {
+    await put(`a${i}`, {
+      name: { stringValue: `Ancestor ${i}` },
+      children: ids([i === 1 ? uid : `a${i - 1}`]),
+      ...(i < 20 && { parents: ids([`a${i + 1}`]) }),
+      updatedAt: { timestampValue: new Date().toISOString() },
+    });
+  }
+
+  await login(page, 'user@generations.test');
+  const cards = page.locator('app-person-card');
+  await expect(page.getByRole('heading', { name: 'Ancestor 9', exact: true })).toBeAttached();
+  // Own card + 9 ancestors; the 10th is a placeholder until it comes near the screen.
+  await expect(cards).toHaveCount(10);
+  await expect(page.locator('.ghost')).toHaveCount(1);
+
+  // Zooming out brings more of the tree near the screen, so more loads.
+  for (let i = 0; i < 6; i++) await page.getByRole('button', { name: 'Zoom out' }).click();
+  await expect.poll(() => cards.count()).toBeGreaterThan(10);
+  // Panning up reaches the oldest generation.
+  const canvas = page.locator('.tree-canvas');
+  for (let i = 0; i < 40; i++) await canvas.press('ArrowUp');
+  await expect(page.getByRole('heading', { name: 'Ancestor 20', exact: true })).toBeAttached();
+
+  // Deleting checks the whole tree, so the warning names everyone who would go.
+  await page.reload();
+  await expect(cards).toHaveCount(10);
+  await page.getByRole('button', { name: 'Edit Ancestor 1' }).dispatchEvent('click'); // above the screen
+  await page.locator('ion-modal').getByRole('button', { name: 'Delete person' }).click();
+  await expect(page.locator('ion-alert')).toContainText('Ancestor 20');
+  await expect(page.locator('ion-alert')).toContainText('19 people');
+  await page.locator('ion-alert').getByRole('button', { name: 'Cancel' }).click();
+});

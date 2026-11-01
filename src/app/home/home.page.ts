@@ -1,9 +1,20 @@
-import { Component, afterNextRender, effect, inject, signal, viewChild, type ElementRef } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  afterNextRender,
+  effect,
+  inject,
+  signal,
+  viewChild,
+  type ElementRef,
+} from '@angular/core';
 import {
   AlertController,
   IonButton,
+  IonCard,
   IonContent,
   IonIcon,
+  IonSkeletonText,
   IonSpinner,
   IonText,
   MenuController,
@@ -13,10 +24,10 @@ import { addIcons } from 'ionicons';
 import { add, locateOutline, remove } from 'ionicons/icons';
 
 import { TopActionsComponent } from '../shared/top-actions.component';
-import { layoutTree, type Layout } from '../tree/layout';
+import { CARD_H, CARD_W, layoutTree, withPlaceholders, type Layout } from '../tree/layout';
 import { PersonCardComponent, type AddRequest } from '../tree/person-card.component';
 import { PersonEditComponent } from '../tree/person-edit.component';
-import { RelationError } from '../tree/relations';
+import { neighbors, RelationError } from '../tree/relations';
 import { TreeService, type Person, type PersonDetails } from '../tree/tree.service';
 import { zoomAt, type View } from '../tree/view';
 
@@ -40,8 +51,10 @@ interface Form {
   styleUrls: ['home.page.scss'],
   imports: [
     IonButton,
+    IonCard,
     IonContent,
     IonIcon,
+    IonSkeletonText,
     IonSpinner,
     IonText,
     PersonCardComponent,
@@ -70,6 +83,9 @@ export class HomePage {
   /** Active pointers (mouse or fingers) on the empty canvas, in client coordinates. */
   private readonly pointers = new Map<number, Point>();
   private layoutRun = 0;
+  private loadTimer?: ReturnType<typeof setTimeout>;
+  protected readonly cardWidth = CARD_W;
+  protected readonly cardHeight = CARD_H;
 
   constructor() {
     addIcons({ add, locateOutline, remove });
@@ -82,17 +98,41 @@ export class HomePage {
       });
       observer.observe(this.canvas().nativeElement);
     });
-    // Re-layout whenever people change; only the latest run wins.
+    // Re-layout whenever people change; only the latest run wins. Linked people
+    // not loaded yet get placeholders, so the layout already keeps their place.
     effect(() => {
       const people = this.people();
       if (!people.size) return;
       const run = ++this.layoutRun;
-      layoutTree(people, this.tree.rootId).then(
+      layoutTree(withPlaceholders(people, this.tree.unloaded()), this.tree.rootId).then(
         (layout) => run === this.layoutRun && this.layout.set(layout),
         () => this.loadError.set("Couldn't draw your family tree."),
       );
     });
+    // While panning and zooming, load the placeholders within one screen of the visible area.
+    effect(() => {
+      const view = this.view();
+      const layout = this.layout();
+      if (!layout) return;
+      clearTimeout(this.loadTimer);
+      this.loadTimer = setTimeout(() => this.loadNear(view, layout), 150);
+    });
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.loadTimer));
     void this.load();
+  }
+
+  /** Loads placeholders whose card is on screen or within one screen of it. */
+  private loadNear(view: View, layout: Layout): void {
+    const { clientWidth: w, clientHeight: h } = this.canvas().nativeElement;
+    // Visible area in world coordinates, grown by one screen on every side.
+    const [mx, my] = [w / view.z, h / view.z];
+    const left = -view.x / view.z - mx;
+    const top = -view.y / view.z - my;
+    const ids = layout.households
+      .filter((hh) => hh.x + CARD_W > left && hh.x < left + 3 * mx && hh.y + CARD_H > top && hh.y < top + 3 * my)
+      .flatMap((hh) => hh.members)
+      .filter((id) => !this.people().has(id));
+    if (ids.length) void this.tree.loadMore(ids).catch(() => undefined); // retried on the next pan
   }
 
   // Dragging from the screen edge pans the canvas instead of opening the side menu.
@@ -179,7 +219,8 @@ export class HomePage {
     e.preventDefault();
   }
 
-  startEdit(person: Person): void {
+  async startEdit(person: Person): Promise<void> {
+    await this.tree.loadMore(neighbors(person)).catch(() => undefined); // names in the relationship list
     const name = (id: string) => this.people().get(id)?.name ?? 'Unknown';
     const rel = (ids: string[] | undefined, label: string) =>
       (ids ?? []).filter((id) => id !== person.id).map((id) => ({ id, name: name(id), label }));
@@ -232,16 +273,15 @@ export class HomePage {
     if (!person) return;
     const other = this.people().get(otherId)?.name ?? 'this person';
     if (!(await this.confirm(`Remove the relationship between ${person.name} and ${other}?`, 'Remove'))) return;
-    if (await this.run(() => this.tree.unlink(person.id, otherId))) this.startEdit(this.people().get(person.id)!);
+    if (await this.run(() => this.tree.unlink(person.id, otherId))) await this.startEdit(this.people().get(person.id)!);
   }
 
   async remove(): Promise<void> {
     const person = this.form()?.person;
     if (!person) return;
-    const others = this.tree
-      .planDelete(person.id)
-      .remove.filter((id) => id !== person.id)
-      .map((id) => this.people().get(id)?.name);
+    let removed: string[] = [];
+    if (!(await this.run(async () => (removed = (await this.tree.planDelete(person.id)).remove)))) return;
+    const others = removed.filter((id) => id !== person.id).map((id) => this.people().get(id)?.name);
     const message = others.length
       ? `This also deletes ${others.length === 1 ? '1 person' : `${others.length} people`} only connected through them: ${others.join(', ')}.`
       : 'This cannot be undone.';

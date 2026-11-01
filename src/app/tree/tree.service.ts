@@ -1,12 +1,16 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   collection,
   doc,
+  documentId,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
+  type DocumentData,
   type WriteBatch,
 } from 'firebase/firestore';
 
@@ -14,7 +18,7 @@ import { AuthService } from '../core/auth.service';
 import { AvatarError, toPhotoDataUrl } from '../core/avatar';
 import { FIRESTORE } from '../core/firebase';
 
-import { addRelative, deletePerson, unlink, type Change, type Relation } from './relations';
+import { addRelative, deletePerson, neighbors, unlink, type Change, type Relation } from './relations';
 
 export type Gender = 'male' | 'female' | 'other';
 
@@ -46,6 +50,8 @@ export interface Person extends PersonDetails {
 }
 
 export const MAX_PHOTOS = 5;
+/** People loaded when the canvas opens (the user's own card included). */
+export const INITIAL_PEOPLE = 10;
 
 /** Drops empty optional fields so documents only hold what was entered. */
 export function cleanDetails(d: PersonDetails): PersonDetails {
@@ -73,6 +79,11 @@ export class TreeService {
   /** Loaded photos (data URLs) by "{personId}_{slot}". */
   readonly photos = signal<ReadonlyMap<string, string>>(new Map());
   private readonly loadingPhotos = new Set<string>();
+  /** Linked ids whose documents do not exist. */
+  private readonly missingIds = signal<ReadonlySet<string>>(new Set());
+  private readonly loading = new Set<string>();
+  /** True once loadAll() has run this session. */
+  private complete = false;
 
   private get uid(): string {
     const id = this.auth.profile()?.id;
@@ -90,24 +101,87 @@ export class TreeService {
   }
 
   /**
-   * Loads the whole tree, creating the user's own card from their profile on
-   * first use. ponytail: loads everyone; lazy loading around the visible area
-   * comes in a later step.
+   * Starts a fresh session: the user's own card (created from their profile
+   * on first use) plus the nearest relatives, breadth-first, up to
+   * INITIAL_PEOPLE in total. The canvas loads the rest as the user pans
+   * towards them (loadMore).
    */
   async load(): Promise<void> {
-    const snap = await getDocs(collection(this.db, 'trees', this.uid, 'people'));
-    const people = new Map<string, Person>();
-    for (const d of snap.docs) {
-      const { updatedAt: _, ...data } = d.data();
-      people.set(d.id, { id: d.id, ...data } as Person);
-    }
-    if (!people.has(this.uid)) {
+    this.people.set(new Map());
+    this.photos.set(new Map());
+    this.missingIds.set(new Set());
+    this.complete = false;
+    const snap = await getDoc(this.ref(this.uid));
+    let me: Person;
+    if (snap.exists()) {
+      me = fromDoc(snap.id, snap.data());
+    } else {
       const profile = this.auth.profile()!;
-      const me: Person = { id: this.uid, ...cleanDetails({ name: profile.displayName, email: profile.email }) };
+      me = { id: this.uid, ...cleanDetails({ name: profile.displayName, email: profile.email }) };
       await setDoc(this.ref(me.id), toDoc(me));
-      people.set(me.id, me);
     }
-    this.people.set(people);
+    this.merge([me]);
+
+    let level = [me];
+    while (level.length && this.people().size < INITIAL_PEOPLE) {
+      const next = [...new Set(level.flatMap(neighbors))].filter((id) => !this.people().has(id));
+      level = await this.loadMore(next.slice(0, INITIAL_PEOPLE - this.people().size));
+    }
+  }
+
+  /** Ids linked from loaded people that are not loaded yet (the canvas shows placeholders for them). */
+  readonly unloaded = computed(() => {
+    const people = this.people();
+    const ids = new Set<string>();
+    for (const p of people.values()) for (const id of neighbors(p)) if (!people.has(id)) ids.add(id);
+    for (const id of this.missingIds()) ids.delete(id);
+    return ids;
+  });
+
+  /** Loads these people (if not loaded yet) and returns the ones that were found. */
+  async loadMore(ids: string[]): Promise<Person[]> {
+    const todo = [...new Set(ids)].filter((id) => !this.people().has(id) && !this.loading.has(id));
+    if (!todo.length) return [];
+    todo.forEach((id) => this.loading.add(id));
+    try {
+      const found: Person[] = [];
+      // Firestore's "in" filter takes up to 30 values.
+      for (let i = 0; i < todo.length; i += 30) {
+        const chunk = todo.slice(i, i + 30);
+        const snap = await getDocs(query(this.peopleCol(), where(documentId(), 'in', chunk)));
+        found.push(...snap.docs.map((d) => fromDoc(d.id, d.data())));
+      }
+      // Links to people that no longer exist (e.g. deleted on another device) stay hidden.
+      const foundIds = new Set(found.map((p) => p.id));
+      const gone = todo.filter((id) => !foundIds.has(id));
+      if (gone.length) this.missingIds.set(new Set([...this.missingIds(), ...gone]));
+      this.merge(found);
+      return found;
+    } finally {
+      todo.forEach((id) => this.loading.delete(id));
+    }
+  }
+
+  /**
+   * Loads everyone. Removing a relationship or deleting a person must see the
+   * whole tree to know who would be cut off.
+   */
+  async loadAll(): Promise<void> {
+    if (this.complete) return;
+    const snap = await getDocs(this.peopleCol());
+    this.merge(snap.docs.map((d) => fromDoc(d.id, d.data())));
+    this.complete = true;
+  }
+
+  private peopleCol() {
+    return collection(this.db, 'trees', this.uid, 'people');
+  }
+
+  private merge(people: Person[]): void {
+    if (!people.length) return;
+    const next = new Map(this.people());
+    for (const p of people) next.set(p.id, p);
+    this.people.set(next);
   }
 
   /** Replaces a person's details, keeping their relationships. */
@@ -128,22 +202,26 @@ export class TreeService {
     details: PersonDetails,
     opts: { before?: boolean; otherParent?: string } = {},
   ): Promise<string> {
-    const id = doc(collection(this.db, 'trees', this.uid, 'people')).id;
+    const id = doc(this.peopleCol()).id;
+    // The change also rewrites the person's relatives (e.g. a parent's children), so they must be loaded.
+    await this.loadMore(neighbors(this.people().get(ofId)!));
     await this.commit(addRelative(this.people(), ofId, relation, { id, ...cleanDetails(details) }, opts));
     return id;
   }
 
-  unlink(a: string, b: string): Promise<void> {
-    return this.commit(unlink(this.people(), this.uid, a, b));
+  async unlink(a: string, b: string): Promise<void> {
+    await this.loadAll();
+    await this.commit(unlink(this.people(), this.uid, a, b));
   }
 
   /** What deleting `id` would remove (the person plus anyone only connected through them). */
-  planDelete(id: string): Change {
+  async planDelete(id: string): Promise<Change> {
+    await this.loadAll();
     return deletePerson(this.people(), this.uid, id);
   }
 
-  delete(id: string): Promise<void> {
-    return this.commit(this.planDelete(id));
+  async delete(id: string): Promise<void> {
+    await this.commit(await this.planDelete(id));
   }
 
   /** Loads one photo once; the card shows it when it arrives. */
@@ -214,6 +292,11 @@ export class TreeService {
     for (const p of change.write) next.set(p.id, toPerson(p));
     this.people.set(next);
   }
+}
+
+function fromDoc(id: string, data: DocumentData): Person {
+  const { updatedAt: _, ...rest } = data;
+  return { id, ...rest } as Person;
 }
 
 /** Firestore document for a person: no id, no empty lists, server timestamp. */
