@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/deepakdaneva/generations/compare/v0.3.0...v0.4.0) (2026-11-01)
+
+
+### Features
+
+* spouses side by side instead of stacked; heart only when free to marry ([#12](https://github.com/deepakdaneva/generations/issues/12)) ([3c5221d](https://github.com/deepakdaneva/generations/commit/3c5221d7d9107867064e0f3303818d53351deec0))
+
 ## [0.3.0](https://github.com/deepakdaneva/generations/compare/v0.2.0...v0.3.0) (2026-11-01)
 
 
