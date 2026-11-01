@@ -17,7 +17,7 @@
   }
 }
 
-// World origin sits at the view offset; cards are centered on their position.
+// World origin sits at the view offset; the own card is centered on it.
 .world {
   position: absolute;
   top: 0;
@@ -25,10 +25,67 @@
   transform-origin: 0 0;
 }
 
+.lines {
+  position: absolute;
+  overflow: visible;
+  width: 1px;
+  height: 1px;
+
+  path {
+    fill: none;
+    stroke: var(--ion-color-medium);
+    stroke-width: 2;
+    stroke-linecap: round;
+    // New lines draw themselves in (pathLength="1" makes the dash the whole line).
+    stroke-dasharray: 1;
+    animation: draw 0.6s ease-out;
+  }
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+// A person and their spouses: a stack of cards that fans out on hover, focus or tap.
+.household {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: transform 0.35s ease;
+
+  &:hover,
+  &:focus-within,
+  &.open {
+    z-index: 10;
+  }
+}
+
 .node {
   position: absolute;
-  transform: translate(-50%, -50%);
+  left: calc(var(--i) * 14px);
+  top: calc(var(--i) * -14px);
   user-select: text;
+  transition:
+    left 0.25s ease,
+    top 0.25s ease;
+
+  .household:hover &,
+  .household:focus-within &,
+  .household.open & {
+    left: calc(var(--i) * 304px); // card width plus room for the add buttons
+    top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .household,
+  .node,
+  .lines path {
+    transition: none;
+    animation: none;
+  }
 }
 
 .status {

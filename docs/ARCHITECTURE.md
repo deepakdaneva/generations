@@ -161,6 +161,27 @@ avoid a light flash. The preference is deliberately per device (maintainer
 decision); syncing it per account would need a Firestore field and a rules
 change.
 
+### D13. Family-tree layout with ELK (elkjs)
+
+Family trees are not trees: people have two parents, spouses, and families
+that join. Laying them out neatly is a graph-layout problem, so the canvas
+uses [elkjs](https://github.com/kieler/elkjs) (Eclipse Layout Kernel,
+actively maintained, EPL-2.0 OR GPL-3.0; approved by the maintainer) instead
+of a home-made algorithm. It is the only new runtime dependency.
+
+- A person and their spouses form one node (a stack of cards). Each set of
+  parents gets a 1x1 "family" node: the parents' line drops into it and the
+  children's lines leave from it, which draws the classic family-tree bus.
+  Siblings without known parents hang from a family node of their own.
+- ELK's layered algorithm (top to bottom, orthogonal edges) places the nodes;
+  the app draws the edges as SVG paths with rounded corners under the cards.
+- Cards have a fixed size, so the layout never waits for rendering. Only the
+  front card counts toward a stack's height, so rows stay aligned.
+- ELK is loaded on first use (a lazy chunk of about 340 kB compressed), so it
+  is not in the main bundle. It runs on the main thread; its web worker is the
+  upgrade path if large trees ever stutter.
+- Pan and zoom are plain pointer events and a CSS transform, with no library.
+
 ### D7. Local development on the Emulator Suite
 
 `npm run dev` runs `firebase emulators:exec`, which starts the Auth and
@@ -220,9 +241,22 @@ trees/{uid}/people/{personId}   one document per person; the user's own card has
   address?:      string (≤ 500)
   socials?:      { label, value }[] (≤ 10)
   parents?:      personId[] (≤ 2)   relationship links, kept on both people
-  children?, spouses?, siblings?:   personId[]
+  children?:     personId[]          in sibling order (left to right)
+  spouses?:      personId[]
+  siblings?:     personId[]          only for siblings without known parents:
+                                     the whole group in order, including self
   updatedAt:     timestamp (server time)
 ```
+
+Relationship changes (`src/app/tree/relations.ts`) are pure functions that
+return every person to rewrite; the app saves them in one batch write, so
+both sides of a link always change together. The tree stays connected to the
+user's own card: removing a relationship that is someone's only connection
+is refused, and deleting a person also deletes whoever was only connected
+through them (the user sees the names first). Siblings without parents keep
+a shared `siblings` list; adding a parent to one of them makes the parent
+everyone's, and deleting the only parent of several children turns them into
+such a group.
 
 The family tree is stored as plaintext for now. A later step encrypts each
 person in the browser before it is written, so the database only holds

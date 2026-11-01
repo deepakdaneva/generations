@@ -21,7 +21,7 @@ import {
   IonToolbar,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { addOutline, trashOutline } from 'ionicons/icons';
+import { addOutline, trashOutline, unlinkOutline } from 'ionicons/icons';
 
 import type { Person, PersonDetails } from './tree.service';
 
@@ -33,7 +33,10 @@ const text = (value = '', validators: ValidatorFn[] = []) => new FormControl(val
 const social = (label = 'Instagram', value = '') =>
   new FormGroup({ label: text(label), value: text(value, [Validators.maxLength(200)]) });
 
-/** Modal form for a person's details. Open by setting `person`; emits `save` or `dismissed`. */
+/**
+ * Modal form for a person's details (also used for new people). Open by
+ * setting `person`; emits `save`, `unlink`, `remove` or `dismissed`.
+ */
 @Component({
   selector: 'app-person-edit',
   imports: [
@@ -65,7 +68,7 @@ const social = (label = 'Instagram', value = '') =>
             <ion-buttons slot="start">
               <ion-button (click)="dismissed.emit()">Cancel</ion-button>
             </ion-buttons>
-            <ion-title>Edit details</ion-title>
+            <ion-title>{{ title() }}</ion-title>
             <ion-buttons slot="end">
               <ion-button strong (click)="submit()" [disabled]="busy()">
                 @if (busy()) {
@@ -185,6 +188,42 @@ const social = (label = 'Instagram', value = '') =>
             }
             <button type="submit" hidden></button>
           </form>
+
+          @if (relations().length) {
+            <ion-list>
+              <ion-list-header><ion-label>Relationships</ion-label></ion-list-header>
+              @for (r of relations(); track r.id) {
+                <ion-item>
+                  <ion-label>
+                    {{ r.name }}
+                    <p>{{ r.label }}</p>
+                  </ion-label>
+                  <ion-button
+                    slot="end"
+                    fill="clear"
+                    color="medium"
+                    (click)="unlink.emit(r.id)"
+                    [disabled]="busy()"
+                    [attr.aria-label]="'Remove relationship with ' + r.name"
+                  >
+                    <ion-icon slot="icon-only" name="unlink-outline"></ion-icon>
+                  </ion-button>
+                </ion-item>
+              }
+            </ion-list>
+          }
+          @if (canDelete()) {
+            <ion-button
+              class="ion-margin-top"
+              expand="block"
+              fill="outline"
+              color="danger"
+              (click)="remove.emit()"
+              [disabled]="busy()"
+            >
+              <ion-icon slot="start" name="trash-outline"></ion-icon>Delete person
+            </ion-button>
+          }
         </ion-content>
       </ng-template>
     </ion-modal>
@@ -209,6 +248,12 @@ const social = (label = 'Instagram', value = '') =>
 })
 export class PersonEditComponent {
   readonly person = input<Person | null>(null);
+  readonly title = input('Edit details');
+  /** Relationships that can be removed here. */
+  readonly relations = input<{ id: string; name: string; label: string }[]>([]);
+  readonly canDelete = input(false);
+  readonly unlink = output<string>();
+  readonly remove = output<void>();
   readonly busy = input(false);
   readonly error = input<string | null>(null);
   readonly save = output<PersonDetails>();
@@ -230,7 +275,7 @@ export class PersonEditComponent {
   });
 
   constructor() {
-    addIcons({ addOutline, trashOutline });
+    addIcons({ addOutline, trashOutline, unlinkOutline });
     effect(() => {
       const p = this.person();
       if (!p) return;

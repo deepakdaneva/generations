@@ -343,3 +343,89 @@ test('family tree: own card can be edited and the canvas panned and zoomed', asy
   await page.getByRole('button', { name: 'Center on me' }).click();
   await expect.poll(async () => Math.round((await card.boundingBox())!.width)).toBe(Math.round(after.width));
 });
+
+test('family tree: add relatives, remove a relationship and delete a person', async ({ page }) => {
+  await login(page, 'admin@generations.test');
+  const card = (name: string) =>
+    page.locator('app-person-card', { has: page.getByRole('heading', { name, exact: true }) });
+  const modal = page.locator('ion-modal');
+  /** Pans with the arrow keys (60 px each) until the card is near the middle of the screen. */
+  async function bringIntoView(name: string) {
+    // Wait until re-layout animations have settled.
+    let box = (await card(name).boundingBox())!;
+    await expect
+      .poll(async () => {
+        const prev = box;
+        box = (await card(name).boundingBox())!;
+        return box.x === prev.x && box.y === prev.y;
+      })
+      .toBe(true);
+    const size = page.viewportSize()!;
+    const canvas = page.locator('.tree-canvas');
+    await canvas.focus();
+    const dx = Math.round((size.width / 2 - (box.x + box.width / 2)) / 60);
+    const dy = Math.round((size.height / 2 - (box.y + box.height / 2)) / 60);
+    for (let i = 0; i < Math.abs(dx); i++) await canvas.press(dx > 0 ? 'ArrowLeft' : 'ArrowRight');
+    for (let i = 0; i < Math.abs(dy); i++) await canvas.press(dy > 0 ? 'ArrowUp' : 'ArrowDown');
+  }
+  /** Opens a card's buttons (tap), clicks one, fills the name and saves. */
+  async function addRelative(of: string, button: string, name: string) {
+    await bringIntoView(of);
+    await card(of)
+      .locator('ion-card')
+      .click({ position: { x: 20, y: 200 } });
+    await page.getByRole('button', { name: `${button} ${of}` }).click();
+    await modal.locator('ion-input[formcontrolname=name] input').fill(name);
+    await modal.getByRole('button', { name: 'Save' }).click();
+    await expect(card(name)).toBeVisible();
+    await expect(modal.locator('form')).toHaveCount(0); // closed, so the canvas gets the keys again
+  }
+
+  await expect(card('Ada Admin')).toBeVisible();
+  await addRelative('Ada Admin', 'Add parent of', 'Father');
+  await addRelative('Ada Admin', 'Add spouse of', 'Partner');
+  // A child with a spouse asks for the other parent first.
+  await bringIntoView('Ada Admin');
+  await card('Ada Admin')
+    .locator('ion-card')
+    .click({ position: { x: 20, y: 200 } });
+  await page.getByRole('button', { name: 'Add child of Ada Admin' }).click();
+  await page.locator('ion-alert').getByRole('button', { name: 'OK' }).click();
+  await modal.locator('ion-input[formcontrolname=name] input').fill('Kid');
+  await modal.getByRole('button', { name: 'Save' }).click();
+  await expect(card('Kid')).toBeVisible();
+  await expect(modal.locator('form')).toHaveCount(0);
+  await addRelative('Father', 'Add parent of', 'Grandfather');
+
+  // Parents are drawn above, children below, joined by lines.
+  const y = async (name: string) => (await card(name).boundingBox())!.y;
+  expect(await y('Father')).toBeLessThan(await y('Ada Admin'));
+  expect(await y('Kid')).toBeGreaterThan(await y('Ada Admin'));
+  await expect(page.locator('.lines path')).toHaveCount(6);
+
+  // Saved: the same tree after a reload.
+  await page.reload();
+  await expect(card('Grandfather')).toBeVisible();
+  await expect(card('Kid')).toBeVisible();
+
+  // Removing the only link to Father (and Grandfather) is refused.
+  await page.getByRole('button', { name: 'Edit Ada Admin' }).click();
+  await modal.getByRole('button', { name: 'Remove relationship with Father' }).click();
+  await page.locator('ion-alert').getByRole('button', { name: 'Remove' }).click();
+  await expect(modal.getByText('only connection to 2 people')).toBeVisible();
+  // Removing the spouse works: the child keeps both parents.
+  await modal.getByRole('button', { name: 'Remove relationship with Partner' }).click();
+  await page.locator('ion-alert').getByRole('button', { name: 'Remove' }).click();
+  await expect(modal.getByRole('button', { name: 'Remove relationship with Partner' })).toBeHidden();
+  await modal.getByRole('button', { name: 'Cancel' }).click();
+
+  // Deleting Father also deletes Grandfather, who is only connected through him.
+  await bringIntoView('Father');
+  await page.getByRole('button', { name: 'Edit Father' }).click();
+  await modal.getByRole('button', { name: 'Delete person' }).click();
+  await expect(page.locator('ion-alert')).toContainText('Grandfather');
+  await page.locator('ion-alert').getByRole('button', { name: 'Delete' }).click();
+  await expect(card('Father')).toBeHidden();
+  await expect(card('Grandfather')).toBeHidden();
+  await expect(card('Kid')).toBeVisible();
+});

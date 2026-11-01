@@ -60,12 +60,19 @@ reasoning behind these choices.
 - **About** (profile button → About, or the version link on the sign-in page):
   version, commit, deployment time, environment, source code, issues, security
   policy, license and copyright. Public, no sign-in needed.
-- **Family tree (in progress):** the home page is a canvas showing your own
-  card. Drag (mouse or finger) or use the arrow keys to move; scroll, pinch or
-  use the +/- buttons to zoom; the target button re-centers. The pencil on a
-  card edits name, dates of birth, death and anniversary, gender, email,
-  place/address and up to 10 social links. Relatives, photos and encryption
-  follow in later steps.
+- **Family tree (in progress):** the home page is a canvas centered on your
+  own card. Drag (mouse or finger) or use the arrow keys to move; scroll, pinch
+  or use the +/- buttons to zoom; the target button re-centers.
+  - Hover or tap a card for its buttons: **+** on top adds a parent, left and
+    right add a sibling on that side, bottom adds a child, the heart adds a
+    spouse. Lines connect parents to their children.
+  - Spouses are stacked behind the card and fan out on hover or tap.
+  - The pencil edits name, dates of birth, death and anniversary, gender,
+    email, place/address and up to 10 social links. It also lists the
+    person's relationships to remove one, and deletes the person (anyone
+    only connected through them is deleted too, after a warning).
+  - Photos, lazy loading, the "remember position" setting and encryption
+    follow in later steps.
 - **Installable app (PWA):** add it to the home screen on Android, iOS or
   desktop; it opens full screen, starts offline, and offers a reload when a new
   version is deployed.

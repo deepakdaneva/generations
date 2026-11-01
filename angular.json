@@ -18,6 +18,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
+            "allowedCommonJsDependencies": ["elkjs/lib/elk.bundled.js"],
             "outputPath": {
               "base": "www",
               "browser": ""

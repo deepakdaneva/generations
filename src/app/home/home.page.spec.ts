@@ -8,22 +8,27 @@ import { TreeService, type Person } from '../tree/tree.service';
 import { HomePage } from './home.page';
 
 describe('HomePage', () => {
-  it("shows the user's own card on the canvas", async () => {
-    const people = new Map<string, Person>([['u1', { id: 'u1', name: 'Ada Lovelace', birth: '1815-12-10' }]]);
+  it('lays out the tree around the own card', async () => {
+    const people = new Map<string, Person>([
+      ['u1', { id: 'u1', name: 'Ada Lovelace', parents: ['p1'] }],
+      ['p1', { id: 'p1', name: 'Lord Byron', children: ['u1'] }],
+    ]);
     await TestBed.configureTestingModule({
       imports: [HomePage],
       providers: [
         provideRouter([]),
         fakeAuth({ displayName: 'Ada' }),
-        { provide: TreeService, useValue: { people: signal(people), loadRoot: async () => people.get('u1') } },
+        { provide: TreeService, useValue: { people: signal(people), rootId: 'u1', load: async () => undefined } },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(HomePage);
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const card: HTMLElement = fixture.nativeElement.querySelector('.tree-canvas app-person-card');
-    expect(card.textContent).toContain('Ada Lovelace');
-    expect(card.textContent).toContain('AL');
+    const el: HTMLElement = fixture.nativeElement;
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(el.querySelectorAll('app-person-card').length).toBe(2);
+    });
+    expect(el.textContent).toContain('Ada Lovelace');
+    expect(el.textContent).toContain('Lord Byron');
+    expect(el.querySelectorAll('.lines path').length).toBeGreaterThan(0);
   });
 });

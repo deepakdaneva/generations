@@ -1,8 +1,10 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 
 import { AuthService } from '../core/auth.service';
 import { FIRESTORE } from '../core/firebase';
+
+import { addRelative, deletePerson, unlink, type Change, type Relation } from './relations';
 
 export type Gender = 'male' | 'female' | 'other';
 
@@ -65,34 +67,87 @@ export class TreeService {
     return doc(this.db, 'trees', this.uid, 'people', id);
   }
 
-  /** Loads the user's own card, creating it from their profile on first use. */
-  async loadRoot(): Promise<Person> {
-    const id = this.uid;
-    const snap = await getDoc(this.ref(id));
-    if (snap.exists()) return this.put({ id, ...snap.data() } as Person);
-    const profile = this.auth.profile()!;
-    const details = cleanDetails({ name: profile.displayName, email: profile.email });
-    await setDoc(this.ref(id), { ...details, updatedAt: serverTimestamp() });
-    return this.put({ id, ...details });
+  /** The user's own card. */
+  get rootId(): string {
+    return this.uid;
+  }
+
+  /**
+   * Loads the whole tree, creating the user's own card from their profile on
+   * first use. ponytail: loads everyone; lazy loading around the visible area
+   * comes in a later step.
+   */
+  async load(): Promise<void> {
+    const snap = await getDocs(collection(this.db, 'trees', this.uid, 'people'));
+    const people = new Map<string, Person>();
+    for (const d of snap.docs) {
+      const { updatedAt: _, ...data } = d.data();
+      people.set(d.id, { id: d.id, ...data } as Person);
+    }
+    if (!people.has(this.uid)) {
+      const profile = this.auth.profile()!;
+      const me: Person = { id: this.uid, ...cleanDetails({ name: profile.displayName, email: profile.email }) };
+      await setDoc(this.ref(me.id), toDoc(me));
+      people.set(me.id, me);
+    }
+    this.people.set(people);
   }
 
   /** Replaces a person's details, keeping their relationships. */
-  async save(id: string, details: PersonDetails): Promise<void> {
+  save(id: string, details: PersonDetails): Promise<void> {
     const old = this.people().get(id);
     if (!old) throw new Error('Unknown person');
     const { parents, children, spouses, siblings } = old;
-    const links = Object.fromEntries(
-      Object.entries({ parents, children, spouses, siblings }).filter(([, v]) => v?.length),
-    );
-    const clean = cleanDetails(details);
-    await setDoc(this.ref(id), { ...clean, ...links, updatedAt: serverTimestamp() });
-    this.put({ id, ...clean, ...links });
+    return this.commit({ write: [{ id, ...cleanDetails(details), parents, children, spouses, siblings }], remove: [] });
   }
 
-  private put(person: Person): Person {
-    const next = new Map(this.people());
-    next.set(person.id, person);
-    this.people.set(next);
-    return person;
+  /** Adds a new person as `relation` of `ofId`; returns the new id. */
+  async add(
+    ofId: string,
+    relation: Relation,
+    details: PersonDetails,
+    opts: { before?: boolean; otherParent?: string } = {},
+  ): Promise<string> {
+    const id = doc(collection(this.db, 'trees', this.uid, 'people')).id;
+    await this.commit(addRelative(this.people(), ofId, relation, { id, ...cleanDetails(details) }, opts));
+    return id;
   }
+
+  unlink(a: string, b: string): Promise<void> {
+    return this.commit(unlink(this.people(), this.uid, a, b));
+  }
+
+  /** What deleting `id` would remove (the person plus anyone only connected through them). */
+  planDelete(id: string): Change {
+    return deletePerson(this.people(), this.uid, id);
+  }
+
+  delete(id: string): Promise<void> {
+    return this.commit(this.planDelete(id));
+  }
+
+  /** Writes all changed people at once (all or nothing), then updates the local copy. */
+  private async commit(change: Change): Promise<void> {
+    const batch = writeBatch(this.db);
+    for (const p of change.write) batch.set(this.ref(p.id), toDoc(p));
+    for (const id of change.remove) batch.delete(this.ref(id));
+    await batch.commit();
+    const next = new Map(this.people());
+    for (const id of change.remove) next.delete(id);
+    for (const p of change.write) next.set(p.id, toPerson(p));
+    this.people.set(next);
+  }
+}
+
+/** Firestore document for a person: no id, no empty lists, server timestamp. */
+function toDoc(p: Person): Record<string, unknown> {
+  const { id: _, ...data } = toPerson(p);
+  return { ...data, updatedAt: serverTimestamp() };
+}
+
+function toPerson(p: Person): Person {
+  const out = { ...p } as Record<string, unknown>;
+  for (const key of ['parents', 'children', 'spouses', 'siblings'])
+    if (!(out[key] as string[] | undefined)?.length) delete out[key];
+  return out as unknown as Person;
 }
