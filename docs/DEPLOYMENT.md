@@ -72,8 +72,14 @@ done
 # Only the matching GitHub environment may act as the service account.
 gcloud iam service-accounts add-iam-policy-binding github-deployer@P.iam.gserviceaccount.com --project P \
   --role roles/iam.workloadIdentityUser \
-  --member principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/subject/repo:deepakdaneva/generations:environment:ENV
+  --member principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/subject/repo:deepakdaneva@68489729/generations@1371284956:environment:ENV
 ```
+
+The subject uses GitHub's immutable format (`owner@owner_id/repo@repo_id`),
+which this repository has. Check yours with
+`gh api repos/OWNER/REPO/actions/oidc/customization/sub` (`sub_claim_prefix`).
+A wrong subject makes the deploy fail with "Failed to authenticate, have you
+run firebase login?".
 
 Then set two variables on the GitHub environment `ENV` (Settings →
 Environments): `WIF_PROVIDER` =
