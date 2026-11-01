@@ -263,6 +263,15 @@ trees/{uid}/people/{personId}   one document per person; the user's own card has
   photos?:       number[] (≤ 5)      photo slots 0-4 in display order
   updatedAt:     timestamp (server time)
 
+notifications/{uid}             a new account's approval request, for all admins (id = the new user's uid)
+  type:          "account-approval"
+  audience:      "admins"
+  userId, email, displayName
+  status:        "pending" | "approved" | "rejected"
+  readBy:        uid[]              admins who opened it (no longer highlighted for them)
+  actedBy?, actedAt?                the admin who approved or rejected it, and when
+  createdAt:     timestamp (server time)
+
 trees/{uid}                     tree settings
   rememberView:  boolean            "Remember last position" (off when the document is missing)
   view?:         { focus, path, dx, dy, z }   saved position, only while rememberView is on
@@ -347,6 +356,13 @@ ciphertext.
   (ids `{personId}_{0-4}`, small JPEG/WebP data URLs only). Admins cannot read other users'
   trees. Writes must match the shape above, and `updatedAt` must be the
   server time.
+- Notifications: a verified user may create only `notifications/{their uid}`,
+  as a pending `account-approval` for the admins, with their own email, and
+  only while their profile is inactive (checked with `getAfter`, so it works
+  in the same batch that creates the profile). Only active admins read them
+  (queries must filter `audience == "admins"`), add themselves to `readBy`,
+  and set the status once; approving must activate the user in the same
+  batch. Nobody deletes them.
 - Every other path is denied.
 
 `tests/rules/firestore.rules.spec.ts` covers these cases against the Firestore
@@ -359,7 +375,13 @@ emulator (`npm run test:rules`).
 2. **Sign in:** if the email is not verified, sign out again and offer to
    resend the verification email.
 3. **First verified sign-in:** the app creates the user's profile
-   (`role: "user"`, `active: false`); the rules enforce those values. The
+   (`role: "user"`, `active: false`), and in the same batch write a
+   notification asking the admins for approval (there is no backend to do it;
+   the rules allow exactly this). The rules enforce those values. Accounts
+   registered before notifications existed get their request on their next
+   sign-in attempt. Admins approve or reject from the notification (bell);
+   rejecting keeps the account inactive, since the Auth account cannot be
+   deleted without the Admin SDK. The
    account **waits for an admin to activate it** (Users page → Activate), so
    strangers cannot join a family's data just by registering. The app waits
    for the server to confirm that write before signing the user out.

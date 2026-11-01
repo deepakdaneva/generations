@@ -15,9 +15,13 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
+  writeBatch,
+  arrayUnion,
 } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
@@ -132,6 +136,72 @@ describe('own profile: name and picture', () => {
     assertFails(updateDoc(doc(db('off'), 'users/off'), { displayName: 'Back' })));
   it("blocks admins from setting other users' pictures", () =>
     assertFails(updateDoc(doc(db('admin'), 'users/alice'), { photo })));
+});
+
+describe('notifications', () => {
+  const request = (uid: string, extra: Record<string, unknown> = {}) => ({
+    type: 'account-approval',
+    audience: 'admins',
+    userId: uid,
+    email: `${uid}@example.test`,
+    displayName: uid,
+    status: 'pending',
+    readBy: [],
+    createdAt: serverTimestamp(),
+    ...extra,
+  });
+  const seedRequest = (uid: string) =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), `notifications/${uid}`), { ...request(uid), createdAt: new Date() }),
+    );
+
+  it('lets a new, inactive user ask for approval, once and only for themselves', async () => {
+    const fs = db('bob');
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, 'users/bob'), profile('bob@example.test', 'user', false));
+    batch.set(doc(fs, 'notifications/bob'), request('bob'));
+    await assertSucceeds(batch.commit());
+    await assertFails(setDoc(doc(fs, 'notifications/bob'), request('bob'))); // already exists
+    await assertFails(setDoc(doc(db('carol'), 'notifications/bob'), request('bob')));
+  });
+  it('blocks requests from active users, or with a wrong status or extra fields', async () => {
+    await assertFails(setDoc(doc(db('alice'), 'notifications/alice'), request('alice')));
+    await assertFails(setDoc(doc(db('off'), 'notifications/off'), request('off', { status: 'approved' })));
+    await assertFails(setDoc(doc(db('off'), 'notifications/off'), request('off', { x: 1 })));
+    await assertSucceeds(setDoc(doc(db('off'), 'notifications/off'), request('off')));
+  });
+  it('lets only active admins read requests and mark them read', async () => {
+    await seedRequest('off');
+    await assertSucceeds(getDocs(query(collection(db('admin'), 'notifications'), where('audience', '==', 'admins'))));
+    await assertFails(getDoc(doc(db('alice'), 'notifications/off')));
+    await assertFails(getDoc(doc(db('off'), 'notifications/off')));
+    await assertSucceeds(updateDoc(doc(db('admin'), 'notifications/off'), { readBy: arrayUnion('admin') }));
+    await assertFails(updateDoc(doc(db('admin'), 'notifications/off'), { readBy: ['someone-else'] }));
+    await assertFails(updateDoc(doc(db('alice'), 'notifications/off'), { readBy: arrayUnion('alice') }));
+  });
+  it('lets an admin approve (activating the user in the same batch) or reject, once', async () => {
+    await seedRequest('off');
+    const fs = db('admin');
+    const acted = (status: string) => ({ status, actedBy: 'admin', actedAt: serverTimestamp() });
+    // Approving without activating the user is refused.
+    await assertFails(updateDoc(doc(fs, 'notifications/off'), acted('approved')));
+    const batch = writeBatch(fs);
+    batch.update(doc(fs, 'users/off'), { active: true });
+    batch.update(doc(fs, 'notifications/off'), acted('approved'));
+    await assertSucceeds(batch.commit());
+    await assertFails(updateDoc(doc(fs, 'notifications/off'), acted('rejected'))); // already acted on
+    await assertFails(deleteDoc(doc(fs, 'notifications/off')));
+  });
+  it('lets an admin reject without changing the account', async () => {
+    await seedRequest('off');
+    await assertSucceeds(
+      updateDoc(doc(db('admin'), 'notifications/off'), {
+        status: 'rejected',
+        actedBy: 'admin',
+        actedAt: serverTimestamp(),
+      }),
+    );
+  });
 });
 
 describe('family tree', () => {

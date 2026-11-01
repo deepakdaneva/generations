@@ -16,9 +16,11 @@ import { informationCircleOutline, logOutOutline, personCircle, settingsOutline 
 
 import { AuthService } from '../core/auth.service';
 
+import { NotificationsBellComponent } from './notifications-bell.component';
+
 /**
  * Header-less page chrome: a floating menu button (only shown to admins, via the
- * menu's disabled state) and a profile button. Place it inside <ion-content>;
+ * menu's disabled state), a profile button and the notifications bell. Place it inside <ion-content>;
  * anything projected into it (e.g. a search bar) sits between the two buttons.
  */
 @Component({
@@ -35,6 +37,7 @@ import { AuthService } from '../core/auth.service';
           <ion-icon slot="icon-only" name="person-circle"></ion-icon>
         }
       </ion-button>
+      <app-notifications-bell></app-notifications-bell>
     </div>
 
     <ion-popover #profilePopover [isOpen]="profileOpen()" [event]="profileEvent" (didDismiss)="profileOpen.set(false)">
@@ -103,7 +106,18 @@ import { AuthService } from '../core/auth.service';
       margin-left: auto;
     }
   `,
-  imports: [IonAvatar, IonButton, IonContent, IonIcon, IonItem, IonLabel, IonList, IonMenuButton, IonPopover],
+  imports: [
+    IonAvatar,
+    IonButton,
+    IonContent,
+    IonIcon,
+    IonItem,
+    IonLabel,
+    IonList,
+    IonMenuButton,
+    IonPopover,
+    NotificationsBellComponent,
+  ],
 })
 export class TopActionsComponent {
   protected readonly auth = inject(AuthService);

@@ -395,6 +395,8 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   const modal = page.locator('ion-modal');
   /** Pans with the arrow keys (60 px each) until the card is near the middle of the screen. */
   async function bringIntoView(name: string) {
+    // A closing modal still holds the keyboard focus; wait until it is gone.
+    await expect(modal.locator('form')).toHaveCount(0);
     // Wait until re-layout animations have settled.
     let box = (await card(name).boundingBox())!;
     await expect
@@ -650,4 +652,57 @@ test('family tree: "Remember last position" reopens where the user left, only wh
   await page.goto('/home');
   await relogin();
   await expect.poll(box).toEqual(centered);
+});
+
+test('admins are notified of new accounts, and approve them from the notification', async ({ page }) => {
+  test.slow(); // several sign-ins
+  // A new, verified account signs in for the first time: the app creates its
+  // inactive profile and, with it, the approval request for the admins.
+  const email = `new-${Date.now()}@generations.test`;
+  await fetch(`${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/projects/demo-generations/accounts`, {
+    method: 'POST',
+    headers: OWNER,
+    body: JSON.stringify({ email, password: PASSWORD, displayName: 'Nora New', emailVerified: true }),
+  });
+  await login(page, email);
+  await expect(page.getByText("Your account isn't active")).toBeVisible();
+
+  // The admin's bell counts it (other tests may have left requests too).
+  await login(page, 'admin@generations.test');
+  const bell = page.getByRole('button', { name: /^Notifications/ }).filter({ visible: true });
+  await expect(bell).toHaveAccessibleName(/Notifications, \d+ new/);
+  const count = Number(/(\d+) new/.exec((await bell.getAttribute('aria-label')) ?? '')![1]);
+  const badge = (n: number) => (n ? `Notifications, ${n} new` : 'Notifications');
+
+  await bell.click();
+  const item = page.locator('ion-popover ion-item', { hasText: 'Nora New wants to join' });
+  await expect(item).toHaveClass(/\bnew\b/);
+  await item.click();
+  const details = page.locator('ion-modal', { hasText: 'New account' });
+  await expect(details.getByText(`(${email})`)).toBeVisible();
+  await details.getByRole('button', { name: 'Approve' }).click();
+  await expect(details.getByText(/Approved\s+by you/)).toBeVisible();
+  await expect(details.getByRole('button', { name: 'Approve' })).toBeDisabled();
+  await expect(details.getByRole('button', { name: 'Reject' })).toBeDisabled();
+  await details.getByRole('button', { name: 'Close' }).click();
+  // Opened and acted on: one less on the badge.
+  await expect(bell).toHaveAccessibleName(badge(count - 1));
+
+  // Still listed, no longer highlighted; opening it again keeps the buttons off,
+  // and the name leads to the user on the Users page.
+  await bell.click();
+  await expect(item).not.toHaveClass(/\bnew\b/);
+  await expect(item).toContainText('Approved');
+  await item.click();
+  await expect(details.getByRole('button', { name: 'Approve' })).toBeDisabled();
+  await details.getByRole('link', { name: 'Nora New' }).click();
+  await expect(page).toHaveURL(/\/users/);
+  await expect(page.locator('ion-action-sheet')).toContainText('Nora New');
+  await page.locator('ion-action-sheet').getByRole('button', { name: 'Cancel' }).click();
+
+  // Approved: the new user can sign in.
+  await page.getByRole('button', { name: 'Profile menu' }).filter({ visible: true }).click();
+  await page.getByText('Logout').click();
+  await login(page, email);
+  await expect(page).toHaveURL(/\/home$/);
 });
