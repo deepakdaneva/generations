@@ -71,8 +71,11 @@ reasoning behind these choices.
     email, place/address and up to 10 social links. It also lists the
     person's relationships to remove one, and deletes the person (anyone
     only connected through them is deleted too, after a warning).
-  - Photos, lazy loading, the "remember position" setting and encryption
-    follow in later steps.
+  - Up to 5 photos per person: "+ add" on the photo circle, arrows to browse,
+    the bin to remove. Photos are shrunk in the browser (longest side 480 px,
+    about 10-40 KB each) before they are saved.
+  - Lazy loading, the "remember position" setting and encryption follow in
+    later steps.
 - **Installable app (PWA):** add it to the home screen on Android, iOS or
   desktop; it opens full screen, starts offline, and offers a reload when a new
   version is deployed.

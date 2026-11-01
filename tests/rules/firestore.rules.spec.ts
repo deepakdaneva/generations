@@ -162,12 +162,28 @@ describe('family tree', () => {
     await assertFails(setDoc(doc(db('off'), 'trees/off/people/off'), person()));
     await assertFails(getDoc(doc(db('alice', false), 'trees/alice/people/alice')));
   });
+  it('lets the owner store up to 5 small photos per person, and nothing else', async () => {
+    const photo = (data = 'data:image/webp;base64,' + 'A'.repeat(40000)) => ({ data, updatedAt: serverTimestamp() });
+    await assertSucceeds(setDoc(doc(db('alice'), 'trees/alice/photos/p1_0'), photo()));
+    await assertSucceeds(setDoc(doc(db('alice'), 'trees/alice/photos/p1_4'), photo()));
+    await assertSucceeds(getDoc(doc(db('alice'), 'trees/alice/photos/p1_4')));
+    await assertSucceeds(deleteDoc(doc(db('alice'), 'trees/alice/photos/p1_4')));
+    await assertFails(setDoc(doc(db('alice'), 'trees/alice/photos/p1_5'), photo()));
+    await assertFails(setDoc(doc(db('alice'), 'trees/alice/photos/p1'), photo()));
+    await assertFails(
+      setDoc(doc(db('alice'), 'trees/alice/photos/p1_0'), photo('data:image/webp;base64,' + 'A'.repeat(100000))),
+    );
+    await assertFails(setDoc(doc(db('alice'), 'trees/alice/photos/p1_0'), photo('https://example.com/a.png')));
+    await assertFails(getDoc(doc(db('admin'), 'trees/alice/photos/p1_0')));
+    await assertFails(setDoc(doc(db('admin'), 'trees/alice/photos/p1_1'), photo()));
+  });
   it('blocks invalid people', async () => {
     const ref = doc(db('alice'), 'trees/alice/people/p1');
     await assertFails(setDoc(ref, person({ name: '' })));
     await assertFails(setDoc(ref, person({ gender: 'robot' })));
     await assertFails(setDoc(ref, person({ birth: '1 April 1990' })));
     await assertFails(setDoc(ref, person({ parents: ['a', 'b', 'c'] })));
+    await assertFails(setDoc(ref, person({ photos: [0, 1, 2, 3, 4, 0] })));
     await assertFails(setDoc(ref, person({ extra: true })));
     await assertFails(setDoc(ref, person({ updatedAt: new Date(0) })));
   });

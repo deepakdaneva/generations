@@ -245,8 +245,22 @@ trees/{uid}/people/{personId}   one document per person; the user's own card has
   spouses?:      personId[]
   siblings?:     personId[]          only for siblings without known parents:
                                      the whole group in order, including self
+  photos?:       number[] (≤ 5)      photo slots 0-4 in display order
+  updatedAt:     timestamp (server time)
+
+trees/{uid}/photos/{personId}_{slot}   slot 0-4, so at most 5 photos per person
+  data:          string   (WebP/JPEG data URL, at most 100,000 characters)
   updatedAt:     timestamp (server time)
 ```
+
+Photos follow D11: `toPhotoDataUrl()` in `src/app/core/avatar.ts` keeps the
+whole picture, scales the longest side to 480 px (faces stay clearly
+recognizable) and compresses it to the lowest quality step that fits, usually
+10-40 KB. Each photo is its own document, so a card reads only the photo on
+screen (one read), and the 1 MiB document limit is never near. Adding or
+removing a photo updates the person's `photos` list in the same batch write;
+deleting a person deletes their photos too. At five 40 KB photos per person
+the free 1 GiB holds roughly 5,000 fully photographed people.
 
 Relationship changes (`src/app/tree/relations.ts`) are pure functions that
 return every person to rewrite; the app saves them in one batch write, so
@@ -278,7 +292,8 @@ ciphertext.
 - Profiles are never deleted: the Auth account would remain and could recreate
   its profile. Deactivate instead.
 - Family tree: only the owner, while active, can read, create, update and
-  delete people in `trees/{uid}/people`. Admins cannot read other users'
+  delete people in `trees/{uid}/people` and photos in `trees/{uid}/photos`
+  (ids `{personId}_{0-4}`, small JPEG/WebP data URLs only). Admins cannot read other users'
   trees. Writes must match the shape above, and `updatedAt` must be the
   server time.
 - Every other path is denied.

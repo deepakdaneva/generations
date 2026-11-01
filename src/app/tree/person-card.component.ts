@@ -1,10 +1,21 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, input, output } from '@angular/core';
-import { IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon } from '@ionic/angular';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  IonButton,
+  IonCard,
+  IonCardContent,
+  IonCardHeader,
+  IonCardTitle,
+  IonIcon,
+  IonSpinner,
+  ToastController,
+} from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   add,
   calendarOutline,
+  chevronBack,
+  chevronForward,
   createOutline,
   heart,
   heartOutline,
@@ -12,11 +23,14 @@ import {
   locationOutline,
   maleFemaleOutline,
   mailOutline,
+  trashOutline,
 } from 'ionicons/icons';
+
+import { AvatarError } from '../core/avatar';
 
 import { CARD_H, CARD_W } from './layout';
 import type { Relation } from './relations';
-import type { Person } from './tree.service';
+import { MAX_PHOTOS, TreeService, type Person } from './tree.service';
 
 export interface AddRequest {
   relation: Relation;
@@ -27,7 +41,7 @@ export interface AddRequest {
 /** One person on the canvas, with buttons around it to add relatives. */
 @Component({
   selector: 'app-person-card',
-  imports: [DatePipe, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon],
+  imports: [DatePipe, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon, IonSpinner],
   host: { '[style.width.px]': 'width', '[style.height.px]': 'height' },
   template: `
     <ion-card class="person">
@@ -41,7 +55,60 @@ export interface AddRequest {
       >
         <ion-icon slot="icon-only" name="create-outline"></ion-icon>
       </ion-button>
-      <div class="photo" aria-hidden="true">{{ initials() }}</div>
+      <div class="photo">
+        @if (slot() !== undefined) {
+          @if (photoUrl(); as url) {
+            <img [src]="url" [alt]="'Photo ' + (index() + 1) + ' of ' + person().name" draggable="false" />
+          } @else {
+            <ion-spinner name="dots" aria-label="Loading photo"></ion-spinner>
+          }
+        } @else {
+          <span aria-hidden="true">{{ initials() }}</span>
+        }
+        @if (slots().length > 1) {
+          <ion-button class="arrow prev" fill="clear" size="small" (click)="step(-1)" aria-label="Previous photo">
+            <ion-icon slot="icon-only" name="chevron-back"></ion-icon>
+          </ion-button>
+          <ion-button class="arrow next" fill="clear" size="small" (click)="step(1)" aria-label="Next photo">
+            <ion-icon slot="icon-only" name="chevron-forward"></ion-icon>
+          </ion-button>
+        }
+        <div class="photo-actions" [class.always]="!slots().length">
+          @if (busy()) {
+            <ion-spinner name="crescent" aria-label="Saving photo"></ion-spinner>
+          } @else {
+            @if (slots().length < maxPhotos) {
+              <ion-button
+                fill="clear"
+                size="small"
+                (click)="file.click()"
+                [attr.aria-label]="'Add photo of ' + person().name"
+              >
+                <ion-icon slot="start" name="add"></ion-icon>add
+              </ion-button>
+            }
+            @if (slot() !== undefined) {
+              <ion-button
+                fill="clear"
+                size="small"
+                color="danger"
+                (click)="removePhoto()"
+                aria-label="Remove this photo"
+              >
+                <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+              </ion-button>
+            }
+          }
+        </div>
+        <input #file type="file" accept="image/*" hidden (change)="addPhoto(file)" />
+      </div>
+      @if (slots().length > 1) {
+        <div class="dots" aria-hidden="true">
+          @for (s of slots(); track s; let i = $index) {
+            <span [class.on]="i === index()"></span>
+          }
+        </div>
+      }
       <ion-card-header>
         <ion-card-title>{{ person().name }}</ion-card-title>
       </ion-card-header>
@@ -169,16 +236,80 @@ export interface AddRequest {
       z-index: 1;
     }
     .photo {
+      position: relative;
       display: grid;
       place-items: center;
-      width: 104px;
-      height: 104px;
-      margin: 20px auto 0;
+      width: 132px;
+      height: 132px;
+      margin: 16px auto 0;
       border-radius: 50%;
+      overflow: hidden;
       background: var(--ion-color-step-150, #e0e0e0);
       color: var(--ion-color-step-600, #666);
-      font-size: 36px;
+      font-size: 40px;
       font-weight: 600;
+    }
+    .photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      margin: 0;
+      --color: #fff;
+      --padding-start: 2px;
+      --padding-end: 2px;
+      filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+    }
+    .prev {
+      left: 2px;
+    }
+    .next {
+      right: 2px;
+    }
+    /* "+ add" and remove sit along the bottom of the circle; always shown while there is no photo. */
+    .photo-actions {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 34px;
+      background: rgba(var(--ion-background-color-rgb, 255, 255, 255), 0.85);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .photo-actions ion-button {
+      margin: 0;
+      font-size: 13px;
+      --padding-start: 4px;
+      --padding-end: 4px;
+    }
+    .photo-actions.always,
+    :host(:hover) .photo-actions,
+    :host(:focus-within) .photo-actions,
+    :host(.active) .photo-actions {
+      opacity: 1;
+    }
+    .dots {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ion-color-step-300, #bbb);
+    }
+    .dots span.on {
+      background: var(--ion-color-primary);
     }
     ion-card-header {
       padding-bottom: 4px;
@@ -269,10 +400,28 @@ export class PersonCardComponent {
       .join(''),
   );
 
+  private readonly tree = inject(TreeService);
+  private readonly toasts = inject(ToastController);
+  protected readonly maxPhotos = MAX_PHOTOS;
+  protected readonly busy = signal(false);
+  protected readonly index = signal(0);
+  protected readonly slots = computed(() => this.person().photos ?? []);
+  /** Photo slot shown now; stays in range when photos are removed. */
+  protected readonly slot = computed(() => {
+    const slots = this.slots();
+    return slots.length ? slots[Math.max(0, Math.min(this.index(), slots.length - 1))] : undefined;
+  });
+  protected readonly photoUrl = computed(() => {
+    const slot = this.slot();
+    return slot === undefined ? null : (this.tree.photos().get(`${this.person().id}_${slot}`) ?? null);
+  });
+
   constructor() {
     addIcons({
       add,
       calendarOutline,
+      chevronBack,
+      chevronForward,
       createOutline,
       heart,
       heartOutline,
@@ -280,6 +429,47 @@ export class PersonCardComponent {
       locationOutline,
       maleFemaleOutline,
       mailOutline,
+      trashOutline,
     });
+    // Fetch only the photo on screen.
+    effect(() => {
+      const slot = this.slot();
+      if (slot !== undefined) void this.tree.loadPhoto(this.person().id, slot);
+    });
+  }
+
+  protected step(by: number): void {
+    const n = this.slots().length;
+    this.index.update((i) => (Math.min(i, n - 1) + by + n) % n);
+  }
+
+  protected async addPhoto(input: HTMLInputElement): Promise<void> {
+    const file = input.files?.[0];
+    input.value = ''; // allow picking the same file again
+    if (!file || this.busy()) return; // one save at a time, so two picks never take the same slot
+    const id = this.person().id;
+    // Show the new photo; the `person` input itself only updates on the next render.
+    if (await this.run(() => this.tree.addPhoto(id, file)))
+      this.index.set((this.tree.people().get(id)?.photos?.length ?? 1) - 1);
+  }
+
+  protected async removePhoto(): Promise<void> {
+    const slot = this.slot();
+    if (slot !== undefined) await this.run(() => this.tree.removePhoto(this.person().id, slot));
+  }
+
+  private async run(action: () => Promise<void>): Promise<boolean> {
+    this.busy.set(true);
+    try {
+      await action();
+      return true;
+    } catch (e) {
+      const message = e instanceof AvatarError ? e.message : "Couldn't save the photo. Check your connection.";
+      const toast = await this.toasts.create({ message, color: 'danger', duration: 4000, position: 'bottom' });
+      await toast.present();
+      return false;
+    } finally {
+      this.busy.set(false);
+    }
   }
 }

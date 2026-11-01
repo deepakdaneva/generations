@@ -267,7 +267,7 @@ test('profile page: picture is cropped, shrunk and shown; name editable; email l
   await expect(page).toHaveURL(/\/profile$/);
 
   // A wide 1200x630 photo becomes a 256x256 square, well under the size cap.
-  await page.locator('input[type=file]').setInputFiles('public/og-image.jpg');
+  await page.locator('app-profile input[type=file]').setInputFiles('public/og-image.jpg');
   await expect(page.getByText('Profile picture updated.')).toBeVisible();
   const photo = page.locator('.photo-large img');
   const size = await photo.evaluate(async (img: HTMLImageElement) => {
@@ -428,4 +428,35 @@ test('family tree: add relatives, remove a relationship and delete a person', as
   await expect(card('Father')).toBeHidden();
   await expect(card('Grandfather')).toBeHidden();
   await expect(card('Kid')).toBeVisible();
+});
+
+test('family tree: up to 5 photos per person, browsed with arrows and removable', async ({ page }) => {
+  await login(page, 'admin@generations.test');
+  const me = page.locator('app-person-card', { has: page.getByRole('heading', { name: 'Ada Admin', exact: true }) });
+  const file = me.locator('input[type=file]');
+  await expect(me.getByRole('button', { name: 'Add photo of Ada Admin' })).toBeVisible();
+
+  for (let i = 1; i <= 5; i++) {
+    await file.setInputFiles('public/og-image.jpg');
+    await expect(me.getByRole('img', { name: `Photo ${i} of Ada Admin` })).toBeVisible();
+  }
+  // Shrunk in the browser before saving.
+  const src = await me.locator('.photo img').getAttribute('src');
+  expect(src!.length).toBeLessThan(100_000);
+  await me.locator('ion-card').click({ position: { x: 20, y: 250 } });
+  await expect(me.getByRole('button', { name: 'Add photo of Ada Admin' })).toBeHidden(); // 5 is the limit
+
+  await me.getByRole('button', { name: 'Next photo' }).click();
+  await expect(me.getByRole('img', { name: 'Photo 1 of Ada Admin' })).toBeVisible();
+  await me.getByRole('button', { name: 'Previous photo' }).click();
+  await expect(me.getByRole('img', { name: 'Photo 5 of Ada Admin' })).toBeVisible();
+
+  // Saved: after a reload the first photo loads again.
+  await page.reload();
+  await expect(me.getByRole('img', { name: 'Photo 1 of Ada Admin' })).toBeVisible();
+
+  await me.locator('ion-card').click({ position: { x: 20, y: 250 } });
+  await me.getByRole('button', { name: 'Remove this photo' }).click();
+  await expect(me.locator('.dots span')).toHaveCount(4);
+  await expect(me.getByRole('button', { name: 'Add photo of Ada Admin' })).toBeVisible();
 });

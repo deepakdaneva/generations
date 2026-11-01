@@ -18,7 +18,16 @@ describe('HomePage', () => {
       providers: [
         provideRouter([]),
         fakeAuth({ displayName: 'Ada' }),
-        { provide: TreeService, useValue: { people: signal(people), rootId: 'u1', load: async () => undefined } },
+        {
+          provide: TreeService,
+          useValue: {
+            people: signal(people),
+            photos: signal(new Map()),
+            rootId: 'u1',
+            load: async () => undefined,
+            loadPhoto: async () => undefined,
+          },
+        },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(HomePage);

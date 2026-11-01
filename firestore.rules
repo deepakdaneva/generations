@@ -105,7 +105,7 @@ service cloud.firestore {
 
     function validPerson(data) {
       return data.keys().hasOnly(['name', 'gender', 'birth', 'death', 'anniversary', 'email', 'address',
-          'socials', 'parents', 'children', 'spouses', 'siblings', 'updatedAt'])
+          'socials', 'parents', 'children', 'spouses', 'siblings', 'photos', 'updatedAt'])
         && validName(data.name)
         && (!('gender' in data) || data.gender in ['male', 'female', 'other'])
         && optDate(data, 'birth') && optDate(data, 'death') && optDate(data, 'anniversary')
@@ -113,12 +113,31 @@ service cloud.firestore {
         && (!('socials' in data) || (data.socials is list && data.socials.size() <= 10))
         && optIds(data, 'parents', 2) && optIds(data, 'children', 50)
         && optIds(data, 'spouses', 10) && optIds(data, 'siblings', 50)
+        && optIds(data, 'photos', 5)
         && data.updatedAt == request.time;
     }
 
     match /trees/{ownerId}/people/{personId} {
       allow read, delete: if isActive() && request.auth.uid == ownerId;
       allow create, update: if isActive() && request.auth.uid == ownerId && validPerson(request.resource.data);
+    }
+
+    // Up to 5 photos per person: the id is "{personId}_{0-4}", so there are only
+    // five possible documents. Each is a small WebP/JPEG data URL (the app
+    // sends 480 px images of ~20-40 KB; Cloud Storage needs the paid plan).
+    function validTreePhoto(data) {
+      return data.keys().hasOnly(['data', 'updatedAt'])
+        && data.data is string
+        && data.data.size() <= 100000
+        && data.data.matches('data:image/(jpeg|webp);base64,[A-Za-z0-9+/=]+')
+        && data.updatedAt == request.time;
+    }
+
+    match /trees/{ownerId}/photos/{photoId} {
+      allow read, delete: if isActive() && request.auth.uid == ownerId;
+      allow create, update: if isActive() && request.auth.uid == ownerId
+        && photoId.matches('[A-Za-z0-9]+_[0-4]')
+        && validTreePhoto(request.resource.data);
     }
 
     // Everything else is denied until a feature defines its own rules.
