@@ -173,8 +173,23 @@ of a home-made algorithm. It is the only new runtime dependency.
   parents gets a 1x1 "family" node: the parents' line drops into it and the
   children's lines leave from it, which draws the classic family-tree bus.
   Siblings without known parents hang from a family node of their own.
+- Every card in a stack has its own port on top of the node (fixed port
+  positions), and lines from parents end at the port of their child's card.
+  So a spouse's parents connect to the spouse's card and ELK places them on
+  that side. When the stack fans out, a short extra line continues from the
+  port to the card's spread-out position, with the relationship label.
+- Households are given to ELK depth-first from the user's own card, each
+  person's family before their spouse's, so the spouse's parents end up
+  outside the other partner's parents and their siblings.
 - ELK's layered algorithm (top to bottom, orthogonal edges) places the nodes;
   the app draws the edges as SVG paths with rounded corners under the cards.
+  Generations are 80 px apart (twice, through the family node), and lines
+  reach each card straight down for at least 56 px, which leaves room for
+  the relationship label (son, daughter, child, ...) on the line.
+- Birth order is the order of the parents' `children` lists, which the form
+  sets when a child or sibling is added. Gender is required by the form
+  only, not by the security rules, because adding a relative also rewrites
+  older cards that may have no gender yet.
 - Cards have a fixed size, so the layout never waits for rendering. Only the
   front card counts toward a stack's height, so rows stay aligned.
 - ELK is loaded on first use (a lazy chunk of about 340 kB compressed), so it
@@ -241,7 +256,7 @@ trees/{uid}/people/{personId}   one document per person; the user's own card has
   address?:      string (≤ 500)
   socials?:      { label, value }[] (≤ 10)
   parents?:      personId[] (≤ 2)   relationship links, kept on both people
-  children?:     personId[]          in sibling order (left to right)
+  children?:     personId[]          in birth order, eldest first (drawn left to right)
   spouses?:      personId[]
   siblings?:     personId[]          only for siblings without known parents:
                                      the whole group in order, including self

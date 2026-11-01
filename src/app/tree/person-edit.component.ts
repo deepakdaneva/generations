@@ -1,4 +1,4 @@
-import { Component, effect, input, output } from '@angular/core';
+import { Component, computed, effect, input, output } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators, type ValidatorFn } from '@angular/forms';
 import {
   IonButton,
@@ -24,6 +24,9 @@ import { addIcons } from 'ionicons';
 import { addOutline, trashOutline, unlinkOutline } from 'ionicons/icons';
 
 import type { Person, PersonDetails } from './tree.service';
+
+/** What the form returns: the details, plus the birth order for a new child or sibling. */
+export type PersonForm = PersonDetails & { order: number };
 
 const MAX_SOCIALS = 10;
 export const SOCIAL_LABELS = ['Instagram', 'Facebook', 'X', 'LinkedIn', 'YouTube', 'Website', 'Phone', 'Other'];
@@ -108,12 +111,12 @@ const social = (label = 'Instagram', value = '') =>
             <div class="row">
               <ion-select
                 formControlName="gender"
-                label="Gender"
+                label="Gender *"
                 labelPlacement="floating"
                 fill="outline"
                 interface="popover"
+                errorText="Choose a gender"
               >
-                <ion-select-option value="">Not set</ion-select-option>
                 <ion-select-option value="female">Female</ion-select-option>
                 <ion-select-option value="male">Male</ion-select-option>
                 <ion-select-option value="other">Other</ion-select-option>
@@ -126,6 +129,20 @@ const social = (label = 'Instagram', value = '') =>
                 fill="outline"
               ></ion-input>
             </div>
+            @if (orderSlots() > 1) {
+              <ion-select
+                formControlName="order"
+                label="Birth order"
+                labelPlacement="floating"
+                fill="outline"
+                interface="popover"
+                helperText="Siblings are shown eldest to youngest, left to right."
+              >
+                @for (slot of slotList(); track slot) {
+                  <ion-select-option [value]="slot">{{ ordinalLabel(slot) }}</ion-select-option>
+                }
+              </ion-select>
+            }
             <ion-input
               formControlName="email"
               type="email"
@@ -252,11 +269,15 @@ export class PersonEditComponent {
   /** Relationships that can be removed here. */
   readonly relations = input<{ id: string; name: string; label: string }[]>([]);
   readonly canDelete = input(false);
+  /** For a new child or sibling: how many birth-order positions to offer (siblings + 1); 0 hides it. */
+  readonly orderSlots = input(0);
+  /** Preselected birth order (0 = eldest). */
+  readonly orderDefault = input(0);
   readonly unlink = output<string>();
   readonly remove = output<void>();
   readonly busy = input(false);
   readonly error = input<string | null>(null);
-  readonly save = output<PersonDetails>();
+  readonly save = output<PersonForm>();
   readonly dismissed = output<void>();
 
   protected readonly labels = SOCIAL_LABELS;
@@ -267,12 +288,23 @@ export class PersonEditComponent {
     name: text('', [Validators.required, Validators.maxLength(100)]),
     birth: text(),
     death: text(),
-    gender: text(),
+    // Required: it decides the card's tint and the relationship labels (son, daughter, ...).
+    gender: text('', [Validators.required]),
     anniversary: text(),
     email: text('', [Validators.email, Validators.maxLength(254)]),
     address: text('', [Validators.maxLength(500)]),
     socials: this.socials,
+    order: new FormControl(0, { nonNullable: true }),
   });
+  protected readonly slotList = computed(() => Array.from({ length: this.orderSlots() }, (_, i) => i));
+
+  /** "1st (eldest)", "2nd", ..., "4th (youngest)". */
+  protected ordinalLabel(i: number): string {
+    const n = i + 1;
+    const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+    const note = i === 0 ? ' (eldest)' : i === this.orderSlots() - 1 ? ' (youngest)' : '';
+    return `${n}${suffix} child${note}`;
+  }
 
   constructor() {
     addIcons({ addOutline, trashOutline, unlinkOutline });
@@ -289,6 +321,7 @@ export class PersonEditComponent {
         anniversary: p.anniversary ?? '',
         email: p.email ?? '',
         address: p.address ?? '',
+        order: this.orderDefault(),
       });
     });
   }
@@ -298,6 +331,6 @@ export class PersonEditComponent {
       this.form.markAllAsTouched();
       return;
     }
-    this.save.emit(this.form.getRawValue() as PersonDetails);
+    this.save.emit(this.form.getRawValue() as PersonForm);
   }
 }

@@ -11,11 +11,20 @@ export const CARD_H = 340;
  * Only the front card counts for the layout height, so rows stay aligned.
  */
 export const STACK_OFFSET = 14;
+/** Horizontal step between fanned-out spouse cards (card width plus room for the add buttons). */
+export const SPREAD_STEP = 304;
+/**
+ * Lines reach a card's top straight down for at least this long, so the
+ * relationship label and the line to a fanned-out spouse card fit above it.
+ */
+export const DROP = 56;
 
 /** A person with their spouses, drawn as one stack of cards. Members: front card first; x/y: its top-left. */
 export interface Household {
   id: string;
   members: string[];
+  /** Per member: whether a line comes down to their card (from parents or a sibling group). */
+  linked: boolean[];
   x: number;
   y: number;
 }
@@ -53,12 +62,17 @@ export function withPlaceholders(people: People, unloaded: ReadonlySet<string>):
   return all;
 }
 
-/** Spouses (and spouses of spouses) form one household; ordered breadth-first from the root. */
+/**
+ * Spouses (and spouses of spouses) form one household. Households are listed
+ * depth-first from the root, each member's own family before the next
+ * member's, so ELK places a person's side of the family (parents, their
+ * siblings, grandparents) before, and apart from, their spouse's parents.
+ */
 export function households(people: People, rootId: string): string[][] {
   const seen = new Set<string>();
   const result: string[][] = [];
-  const queue = [rootId];
   const visit = (start: string) => {
+    if (seen.has(start) || !people.has(start)) return;
     const members = [start];
     seen.add(start);
     // The loop also visits members pushed while iterating.
@@ -73,11 +87,17 @@ export function households(people: People, rootId: string): string[][] {
     result.push(members);
     for (const id of members) {
       const p = people.get(id)!;
-      queue.push(...(p.parents ?? []), ...(p.children ?? []), ...(p.siblings ?? []));
+      for (const next of [...(p.parents ?? []), ...(p.siblings ?? []), ...(p.children ?? [])]) visit(next);
     }
   };
-  for (let id = queue.shift(); id !== undefined; id = queue.shift()) if (!seen.has(id) && people.has(id)) visit(id);
+  visit(rootId);
   return result;
+}
+
+/** Whether a line comes down to this person's card: from their parents, or their sibling group. */
+function isLinked(people: People, id: string): boolean {
+  const p = people.get(id);
+  return !!p?.parents?.some((x) => people.has(x)) || (p?.siblings?.length ?? 0) > 1;
 }
 
 /**
@@ -91,21 +111,49 @@ export function familyGraph(people: People, rootId: string): ElkNode {
   const householdOf = new Map<string, string>();
   for (const g of groups) for (const id of g) householdOf.set(id, `h:${g[0]}`);
 
-  const size = (n: number) => ({ width: CARD_W + (n - 1) * STACK_OFFSET, height: CARD_H });
-  const nodes: ElkNode[] = groups.map((g) => ({ id: `h:${g[0]}`, ...size(g.length) }));
+  // Each card in a stack has its own port on top, where the line from its
+  // parents arrives, so a spouse's parents connect to the spouse's card (and
+  // sit on that side). Lines to children leave from one port at the bottom.
+  const nodes: ElkNode[] = groups.map((g) => {
+    const id = `h:${g[0]}`;
+    return {
+      id,
+      width: CARD_W + (g.length - 1) * STACK_OFFSET,
+      height: CARD_H,
+      layoutOptions: { 'elk.portConstraints': 'FIXED_POS' },
+      ports: [
+        ...g.map((m, i) => ({
+          id: `${id}:${m}`,
+          x: i * STACK_OFFSET + CARD_W / 2,
+          y: 0,
+          width: 0,
+          height: 0,
+          layoutOptions: { 'elk.port.side': 'NORTH' },
+        })),
+        {
+          id: `${id}:down`,
+          x: CARD_W / 2,
+          y: CARD_H,
+          width: 0,
+          height: 0,
+          layoutOptions: { 'elk.port.side': 'SOUTH' },
+        },
+      ],
+    };
+  });
   const edges: ElkExtendedEdge[] = [];
   const families = new Set<string>();
   const edge = (from: string, to: string) => {
     const id = `${from}>${to}`;
-    if (from !== to && !edges.some((e) => e.id === id)) edges.push({ id, sources: [from], targets: [to] });
+    if (!edges.some((e) => e.id === id)) edges.push({ id, sources: [from], targets: [to] });
   };
   const family = (id: string, sources: string[], children: string[]) => {
     if (!families.has(id)) {
       families.add(id);
       nodes.push({ id, width: 1, height: 1 });
-      for (const s of sources) edge(householdOf.get(s)!, id);
+      for (const h of new Set(sources.map((s) => householdOf.get(s)!))) edge(`${h}:down`, id);
     }
-    for (const c of children) edge(id, householdOf.get(c)!);
+    for (const c of children) edge(id, `${householdOf.get(c)!}:${c}`);
   };
 
   for (const g of groups) {
@@ -138,8 +186,9 @@ export function familyGraph(people: People, rootId: string): ElkNode {
       'elk.direction': 'DOWN',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.spacing.nodeNode': '48',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '36',
-      'elk.layered.spacing.edgeNodeBetweenLayers': '18',
+      // Generous gaps between generations make parent-child links easy to follow.
+      'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+      'elk.layered.spacing.edgeNodeBetweenLayers': String(DROP),
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
       'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
@@ -188,7 +237,11 @@ export async function layoutTree(people: People, rootId: string): Promise<Layout
   return {
     households: graph
       .children!.filter((node) => groups.has(node.id))
-      .map((node) => ({ id: node.id, members: groups.get(node.id)!, x: node.x! - ox, y: node.y! - oy })),
+      .map((node) => {
+        const members = groups.get(node.id)!;
+        const linked = members.map((m) => isLinked(people, m));
+        return { id: node.id, members, linked, x: node.x! - ox, y: node.y! - oy };
+      }),
     lines: (graph.edges ?? []).flatMap((e) =>
       (e.sections ?? []).map((s) => ({
         id: e.id,

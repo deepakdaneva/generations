@@ -46,6 +46,20 @@ describe('addRelative', () => {
     expect(get('me').siblings).toBeUndefined();
   });
 
+  it('places children and siblings by birth order, eldest first', () => {
+    add('me', 'spouse', 'wife');
+    add('me', 'child', 'second', { otherParent: 'wife' });
+    add('me', 'child', 'third', { otherParent: 'wife' }); // youngest by default
+    add('me', 'child', 'first', { otherParent: 'wife', position: 0 });
+    expect(get('me').children).toEqual(['first', 'second', 'third']);
+    expect(get('wife').children).toEqual(['first', 'second', 'third']);
+    // A half-sibling (other parents) does not count in this family's order.
+    add('me', 'child', 'half');
+    add('third', 'sibling', 'between', { position: 2 });
+    expect(get('me').children).toEqual(['first', 'second', 'between', 'third', 'half']);
+    expect(get('between').parents).toEqual(['me', 'wife']);
+  });
+
   it('groups siblings without parents, and a later parent adopts the whole group', () => {
     add('me', 'sibling', 'sis');
     add('me', 'sibling', 'bro', { before: true });

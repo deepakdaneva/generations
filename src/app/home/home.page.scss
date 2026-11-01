@@ -79,9 +79,68 @@
   }
 }
 
+// Lines to fanned-out spouse cards: only while the stack is fanned out.
+.spread-lines {
+  position: absolute;
+  overflow: visible;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+
+  path {
+    fill: none;
+    stroke: var(--ion-color-medium);
+    stroke-width: 2;
+  }
+
+  .household:hover &,
+  .household:focus-within &,
+  .household.open & {
+    opacity: 1;
+  }
+}
+
+// Relationship label on the line just above a card (son, daughter, sister, ...).
+// Positions follow the card: stacked (14px steps) or fanned out (304px steps); 130px is half a card.
+.relation {
+  position: absolute;
+  z-index: 20;
+  left: calc(var(--i) * 14px + 130px);
+  top: calc(-34px - var(--i) * 14px);
+  transform: translate(-50%, -50%);
+  padding: 2px 10px;
+  border: 1px solid var(--ion-color-medium);
+  border-radius: 999px;
+  background: var(--ion-background-color, #fff);
+  color: var(--ion-color-medium-shade, #666);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  transition:
+    left 0.25s ease,
+    top 0.25s ease,
+    opacity 0.25s ease;
+
+  // Labels of spouse cards behind the front card show once the stack fans out.
+  &.back {
+    opacity: 0;
+  }
+
+  .household:hover &,
+  .household:focus-within &,
+  .household.open & {
+    left: calc(var(--i) * 304px + 130px);
+    top: -34px;
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .household,
   .node,
+  .relation,
+  .spread-lines,
   .lines path {
     transition: none;
     animation: none;
