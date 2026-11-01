@@ -110,3 +110,12 @@ ion-menu ion-item.selected {
     color: inherit;
   }
 }
+
+// The person profile popup is long (photos, life, family, contact): taller than
+// Ionic's default 600 px on large screens. Inline modals move to the app root,
+// so this cannot live in the component's styles.
+@media (min-width: 768px) and (min-height: 768px) {
+  ion-modal.profile {
+    --height: min(820px, 92vh);
+  }
+}

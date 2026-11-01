@@ -8,6 +8,34 @@ web, iOS and Android, and is designed to grow into dedicated native apps later.
 
 > **Status:** early development (`v0.0.1`). Not production-ready.
 
+## Screenshots
+
+A made-up demo family, captured from the app running on the local emulators
+(`npm run screenshots`).
+
+![Family tree: three generations with spouses, labelled lines and a remembered grandparent](docs/screenshots/family-tree.png)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/profile.png" alt="Person profile popup with photos, life dates, family and contact details" /><br /><b>Profile:</b> click a card for the person's story; tap a relative to open theirs.</td>
+    <td width="50%"><img src="docs/screenshots/add-relatives.png" alt="A card with its add buttons and highlighted family lines" /><br /><b>Add relatives:</b> parents, siblings, children and spouse from the card's edges; the family's lines light up.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/add-sibling.png" alt="Form to add a sibling with birth order and an option to pick someone already in the tree" /><br /><b>Add a sibling:</b> a new person with birth order, or someone already in the tree.</td>
+    <td><img src="docs/screenshots/in-memory.png" alt="Profile of a deceased grandparent marked In loving memory" /><br /><b>In loving memory:</b> people who have died get a ribbon and a memorial footer.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/notifications.png" alt="Notifications popover listing a new account waiting for approval" /><br /><b>Notifications:</b> admins see new accounts waiting for approval…</td>
+    <td><img src="docs/screenshots/approve-account.png" alt="Approve or reject a new account" /><br />…and approve or reject them in one tap.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/family-tree-dark.png" alt="The family tree in dark mode" /><br /><b>Dark mode</b>, following the system or chosen in Settings.</td>
+    <td><img src="docs/screenshots/sign-in.png" alt="Sign-in page" /><br /><b>Sign in</b> with email or Google; new accounts wait for an admin.</td>
+  </tr>
+</table>
+
+<p align="center"><img src="docs/screenshots/mobile.png" alt="The family tree on a phone" width="280" /><br /><b>On a phone:</b> drag to move, pinch to zoom, tap a card for its buttons.</p>
+
 ## Objectives
 
 - A simple, welcoming way to record family members and how they are related.
@@ -261,6 +289,7 @@ delivered. Their links appear in the emulator log and the Emulator UI.
 | `npm run test:unit` | Unit tests (Vitest) |
 | `npm run test:rules` | Firestore Security Rules tests (starts the Firestore emulator) |
 | `npm run test:e2e` | End-to-end tests against fresh emulators (run `npx playwright install chromium` once first) |
+| `npm run screenshots` | Recapture the README screenshots (made-up demo family, fresh emulators) into `docs/screenshots/` |
 | `npm test` | All of the above tests |
 
 ## Configuration and secrets

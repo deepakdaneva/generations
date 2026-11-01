@@ -306,8 +306,9 @@ export interface AddRequest {
       align-items: center;
       gap: 6px;
       padding: 8px;
-      background: var(--ion-color-dark);
-      color: var(--ion-color-dark-contrast);
+      /* Dark in both themes (Ionic's "dark" colour turns light in dark mode). */
+      background: #222428;
+      color: #fff;
       font-size: 13px;
     }
     .edit {

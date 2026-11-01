@@ -20,7 +20,8 @@
     "test:unit": "ng test --no-watch",
     "test:unit:watch": "ng test --watch",
     "test:rules": "node scripts/emulators-exec.mjs \"vitest run --dir tests/rules\" --only firestore",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts"
   },
   "private": true,
   "dependencies": {
