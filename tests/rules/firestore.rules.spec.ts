@@ -177,6 +177,18 @@ describe('family tree', () => {
     await assertFails(getDoc(doc(db('admin'), 'trees/alice/photos/p1_0')));
     await assertFails(setDoc(doc(db('admin'), 'trees/alice/photos/p1_1'), photo()));
   });
+  it('lets the owner keep their tree settings and saved position', async () => {
+    const ref = doc(db('alice'), 'trees/alice');
+    const view = { focus: 'p1', path: ['alice', 'p1'], dx: 10, dy: -20.5, z: 0.8 };
+    await assertSucceeds(setDoc(ref, { rememberView: true, view, updatedAt: serverTimestamp() }));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(setDoc(ref, { rememberView: false, updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { rememberView: 'yes', updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { rememberView: true, view: { ...view, z: 50 }, updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { rememberView: true, other: 1, updatedAt: serverTimestamp() }));
+    await assertFails(getDoc(doc(db('admin'), 'trees/alice')));
+    await assertFails(setDoc(doc(db('admin'), 'trees/alice'), { rememberView: true, updatedAt: serverTimestamp() }));
+  });
   it('blocks invalid people', async () => {
     const ref = doc(db('alice'), 'trees/alice/people/p1');
     await assertFails(setDoc(ref, person({ name: '' })));

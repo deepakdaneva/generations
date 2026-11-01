@@ -53,6 +53,19 @@ export const MAX_PHOTOS = 5;
 /** People loaded when the canvas opens (the user's own card included). */
 export const INITIAL_PEOPLE = 10;
 
+/**
+ * Where the user left the canvas: the person nearest the middle of the
+ * screen, the chain of ids from the user's own card to them (loaded first on
+ * the next visit), the screen middle's offset from their card, and the zoom.
+ */
+export interface SavedView {
+  focus: string;
+  path: string[];
+  dx: number;
+  dy: number;
+  z: number;
+}
+
 /** Drops empty optional fields so documents only hold what was entered. */
 export function cleanDetails(d: PersonDetails): PersonDetails {
   const out: PersonDetails = { name: d.name.trim() };
@@ -171,6 +184,32 @@ export class TreeService {
     const snap = await getDocs(this.peopleCol());
     this.merge(snap.docs.map((d) => fromDoc(d.id, d.data())));
     this.complete = true;
+  }
+
+  /** "Remember last position" (off by default), per account. */
+  readonly rememberView = signal(false);
+
+  /** Reads the tree settings; returns the saved position when remembering is on. */
+  async loadSettings(): Promise<SavedView | null> {
+    const snap = await getDoc(this.settingsRef());
+    const data = snap.data();
+    this.rememberView.set(data?.['rememberView'] === true);
+    return this.rememberView() ? ((data?.['view'] as SavedView | undefined) ?? null) : null;
+  }
+
+  /** Turning it off also forgets the saved position. */
+  async setRememberView(on: boolean): Promise<void> {
+    await setDoc(this.settingsRef(), { rememberView: on, updatedAt: serverTimestamp() });
+    this.rememberView.set(on);
+  }
+
+  async saveView(view: SavedView): Promise<void> {
+    if (!this.rememberView()) return;
+    await setDoc(this.settingsRef(), { rememberView: true, view, updatedAt: serverTimestamp() });
+  }
+
+  private settingsRef() {
+    return doc(this.db, 'trees', this.uid);
   }
 
   private peopleCol() {

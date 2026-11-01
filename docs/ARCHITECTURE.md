@@ -248,6 +248,11 @@ trees/{uid}/people/{personId}   one document per person; the user's own card has
   photos?:       number[] (≤ 5)      photo slots 0-4 in display order
   updatedAt:     timestamp (server time)
 
+trees/{uid}                     tree settings
+  rememberView:  boolean            "Remember last position" (off when the document is missing)
+  view?:         { focus, path, dx, dy, z }   saved position, only while rememberView is on
+  updatedAt:     timestamp (server time)
+
 trees/{uid}/photos/{personId}_{slot}   slot 0-4, so at most 5 photos per person
   data:          string   (WebP/JPEG data URL, at most 100,000 characters)
   updatedAt:     timestamp (server time)
@@ -280,6 +285,18 @@ the free 1 GiB holds roughly 5,000 fully photographed people.
 - Links to documents that no longer exist (deleted on another device) are
   hidden instead of being retried.
 
+**Remember last position.** Canvas coordinates depend on what is loaded and
+screen positions on the screen size, so the app saves the position relative
+to a person instead: `focus` is the person whose card is nearest the middle
+of the screen, `dx`/`dy` the middle's offset from that card (in canvas units)
+and `z` the zoom. `path` is the shortest chain of ids from the user's own
+card to `focus`; the next visit loads it with one query, so the layout
+contains the saved person even with lazy loading. The view is saved 2 s after
+it stops moving, when leaving the page and on `pagehide`, and only when it
+changed, which keeps writes low. Turning the setting off rewrites the
+document without `view`. If the saved person no longer exists, the canvas
+opens on the user's own card.
+
 Relationship changes (`src/app/tree/relations.ts`) are pure functions that
 return every person to rewrite; the app saves them in one batch write, so
 both sides of a link always change together. The tree stays connected to the
@@ -309,8 +326,9 @@ ciphertext.
   never their own role or status (so an admin cannot lock themselves out).
 - Profiles are never deleted: the Auth account would remain and could recreate
   its profile. Deactivate instead.
-- Family tree: only the owner, while active, can read, create, update and
-  delete people in `trees/{uid}/people` and photos in `trees/{uid}/photos`
+- Family tree: only the owner, while active, can read and write their tree
+  settings (`trees/{uid}`: `rememberView`, a bounded `view`) and read, create,
+  update and delete people in `trees/{uid}/people` and photos in `trees/{uid}/photos`
   (ids `{personId}_{0-4}`, small JPEG/WebP data URLs only). Admins cannot read other users'
   trees. Writes must match the shape above, and `updatedAt` must be the
   server time.

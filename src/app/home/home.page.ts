@@ -24,11 +24,19 @@ import { addIcons } from 'ionicons';
 import { add, locateOutline, remove } from 'ionicons/icons';
 
 import { TopActionsComponent } from '../shared/top-actions.component';
-import { CARD_H, CARD_W, layoutTree, withPlaceholders, type Layout } from '../tree/layout';
+import {
+  CARD_H,
+  CARD_W,
+  layoutTree,
+  STACK_OFFSET,
+  withPlaceholders,
+  type Household,
+  type Layout,
+} from '../tree/layout';
 import { PersonCardComponent, type AddRequest } from '../tree/person-card.component';
 import { PersonEditComponent } from '../tree/person-edit.component';
-import { neighbors, RelationError } from '../tree/relations';
-import { TreeService, type Person, type PersonDetails } from '../tree/tree.service';
+import { neighbors, pathTo, RelationError } from '../tree/relations';
+import { TreeService, type Person, type PersonDetails, type SavedView } from '../tree/tree.service';
 import { zoomAt, type View } from '../tree/view';
 
 type Point = { x: number; y: number };
@@ -84,6 +92,12 @@ export class HomePage {
   private readonly pointers = new Map<number, Point>();
   private layoutRun = 0;
   private loadTimer?: ReturnType<typeof setTimeout>;
+  private saveTimer?: ReturnType<typeof setTimeout>;
+  /** Saved position waiting for its person to be laid out. */
+  private restore: SavedView | null = null;
+  /** Set once the view was placed (centered or restored), so a late resize doesn't move it. */
+  private placed = false;
+  private lastSaved = '';
   protected readonly cardWidth = CARD_W;
   protected readonly cardHeight = CARD_H;
 
@@ -93,7 +107,7 @@ export class HomePage {
     afterNextRender(() => {
       const observer = new ResizeObserver(() => {
         if (!this.canvas().nativeElement.clientWidth) return;
-        this.center();
+        if (!this.placed) this.center();
         observer.disconnect();
       });
       observer.observe(this.canvas().nativeElement);
@@ -105,7 +119,11 @@ export class HomePage {
       if (!people.size) return;
       const run = ++this.layoutRun;
       layoutTree(withPlaceholders(people, this.tree.unloaded()), this.tree.rootId).then(
-        (layout) => run === this.layoutRun && this.layout.set(layout),
+        (layout) => {
+          if (run !== this.layoutRun) return;
+          this.layout.set(layout);
+          this.restoreView(layout);
+        },
         () => this.loadError.set("Couldn't draw your family tree."),
       );
     });
@@ -117,7 +135,21 @@ export class HomePage {
       clearTimeout(this.loadTimer);
       this.loadTimer = setTimeout(() => this.loadNear(view, layout), 150);
     });
-    inject(DestroyRef).onDestroy(() => clearTimeout(this.loadTimer));
+    // "Remember last position": save 2 s after the view stops moving, and when leaving.
+    effect(() => {
+      const view = this.view();
+      const layout = this.layout();
+      if (!layout || !this.tree.rememberView()) return;
+      clearTimeout(this.saveTimer);
+      this.saveTimer = setTimeout(() => this.saveView(view, layout), 2000);
+    });
+    const flush = () => this.flushView();
+    addEventListener('pagehide', flush);
+    inject(DestroyRef).onDestroy(() => {
+      clearTimeout(this.loadTimer);
+      clearTimeout(this.saveTimer);
+      removeEventListener('pagehide', flush);
+    });
     void this.load();
   }
 
@@ -142,12 +174,18 @@ export class HomePage {
 
   ionViewWillLeave(): void {
     void this.menu.swipeGesture(true);
+    this.flushView();
   }
 
   async load(): Promise<void> {
     this.loadError.set(null);
     try {
-      await this.tree.load();
+      // Settings are optional: without them the tree simply opens on the own card.
+      const [saved] = await Promise.all([this.tree.loadSettings().catch(() => null), this.tree.load()]);
+      if (saved) {
+        this.restore = saved;
+        await this.tree.loadMore(saved.path); // the chain to the saved person, so the layout includes them
+      }
     } catch {
       this.loadError.set("Couldn't load your family tree. Check your connection.");
     }
@@ -157,6 +195,66 @@ export class HomePage {
   center(): void {
     const { clientWidth, clientHeight } = this.canvas().nativeElement;
     this.view.set({ x: clientWidth / 2, y: clientHeight / 2, z: 1 });
+    this.placed = true;
+  }
+
+  /** Center of a member's card (stacked, as drawn when not fanned out). */
+  private cardCenter(h: Household, i: number): { x: number; y: number } {
+    return { x: h.x + i * STACK_OFFSET + CARD_W / 2, y: h.y - i * STACK_OFFSET + CARD_H / 2 };
+  }
+
+  /** Moves the view to the saved position once its person is laid out. */
+  private restoreView(layout: Layout): void {
+    const saved = this.restore;
+    if (!saved) return;
+    const h = layout.households.find((hh) => hh.members.includes(saved.focus));
+    if (!h) {
+      // The saved person is gone (deleted, or no longer connected): start on the own card.
+      if (!this.tree.unloaded().size || !saved.path.some((id) => this.tree.unloaded().has(id))) this.restore = null;
+      return;
+    }
+    const c = this.cardCenter(h, h.members.indexOf(saved.focus));
+    const { clientWidth: w, clientHeight: hh } = this.canvas().nativeElement;
+    this.view.set({ x: w / 2 - (c.x + saved.dx) * saved.z, y: hh / 2 - (c.y + saved.dy) * saved.z, z: saved.z });
+    this.restore = null;
+    this.placed = true;
+  }
+
+  /** Saves the person nearest the middle of the screen and the offset from them. */
+  private saveView(view: View, layout: Layout): void {
+    if (!this.tree.rememberView() || this.restore) return;
+    const { clientWidth: w, clientHeight: hh } = this.canvas().nativeElement;
+    const mid = { x: (w / 2 - view.x) / view.z, y: (hh / 2 - view.y) / view.z };
+    let best: { id: string; x: number; y: number; d: number } | undefined;
+    for (const h of layout.households) {
+      h.members.forEach((id, i) => {
+        if (!this.people().has(id)) return;
+        const c = this.cardCenter(h, i);
+        const d = Math.hypot(c.x - mid.x, c.y - mid.y);
+        if (!best || d < best.d) best = { id, ...c, d };
+      });
+    }
+    if (!best) return;
+    const path = pathTo(this.people(), this.tree.rootId, best.id);
+    if (!path) return;
+    const round = (n: number) => Math.round(n * 100) / 100;
+    const saved: SavedView = {
+      focus: best.id,
+      path,
+      dx: round(mid.x - best.x),
+      dy: round(mid.y - best.y),
+      z: round(view.z),
+    };
+    const key = JSON.stringify(saved);
+    if (key === this.lastSaved) return;
+    this.lastSaved = key;
+    void this.tree.saveView(saved).catch(() => (this.lastSaved = '')); // retried on the next move
+  }
+
+  private flushView(): void {
+    clearTimeout(this.saveTimer);
+    const layout = this.layout();
+    if (layout) this.saveView(this.view(), layout);
   }
 
   zoomBy(factor: number): void {

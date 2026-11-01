@@ -240,11 +240,10 @@ test('theme setting switches between Dark, Light and System and is remembered', 
   await page.getByRole('radio', { name: 'Dark' }).click();
   await expect(html).toHaveClass(/ion-palette-dark/);
 
+  await expect(page).toHaveURL(/\/settings$/);
   await page.reload();
   await expect(html).toHaveClass(/ion-palette-dark/);
 
-  await page.getByRole('button', { name: 'Profile menu' }).last().click();
-  await page.getByText('Settings').click();
   await page.getByRole('radio', { name: 'Light' }).click();
   await expect(html).not.toHaveClass(/ion-palette-dark/);
 
@@ -510,4 +509,66 @@ test('family tree: loads the nearest 10 people first, then more while exploring'
   await expect(page.locator('ion-alert')).toContainText('Ancestor 20');
   await expect(page.locator('ion-alert')).toContainText('19 people');
   await page.locator('ion-alert').getByRole('button', { name: 'Cancel' }).click();
+});
+
+test('family tree: "Remember last position" reopens where the user left, only when turned on', async ({ page }) => {
+  const { localId: uid } = await lookup('admin@generations.test');
+  const settingsDoc = `http://127.0.0.1:8080/v1/projects/demo-generations/databases/(default)/documents/trees/${uid}`;
+  const savedZoom = async () => {
+    const res = await fetch(settingsDoc, { headers: { Authorization: 'Bearer owner' } });
+    const doc = (await res.json()) as { fields?: { view?: { mapValue: { fields: { z: { doubleValue?: number } } } } } };
+    return doc.fields?.view?.mapValue.fields.z.doubleValue;
+  };
+  const remembered = async () => {
+    const res = await fetch(settingsDoc, { headers: { Authorization: 'Bearer owner' } });
+    return ((await res.json()) as { fields?: { rememberView?: { booleanValue: boolean } } }).fields?.rememberView
+      ?.booleanValue;
+  };
+  const me = page.locator('app-person-card', { has: page.getByRole('heading', { name: 'Ada Admin', exact: true }) });
+  const canvas = page.locator('.tree-canvas');
+  const box = async () => {
+    const b = (await me.boundingBox())!;
+    return { x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.width) };
+  };
+  const relogin = async () => {
+    await page.getByRole('button', { name: 'Profile menu' }).last().click();
+    await page.getByText('Logout').click();
+    await login(page, 'admin@generations.test');
+    await expect(me).toBeVisible();
+  };
+
+  // Off by default: the canvas opens centered on the own card.
+  await login(page, 'admin@generations.test');
+  await expect(me).toBeVisible();
+  const centered = await box();
+
+  await page.getByRole('button', { name: 'Profile menu' }).last().click();
+  await page.getByText('Settings').click();
+  const toggle = page.getByRole('switch', { name: /Remember last position/ });
+  await expect(toggle).toBeEnabled();
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  await expect.poll(remembered).toBe(true);
+
+  // Move away and zoom out; the position is saved shortly after moving stops.
+  await page.goto('/home');
+  await expect(me).toBeVisible();
+  for (let i = 0; i < 3; i++) await canvas.press('ArrowLeft');
+  await page.getByRole('button', { name: 'Zoom out' }).click();
+  await expect.poll(savedZoom).toBe(0.8);
+  const moved = await box();
+  expect(moved).not.toEqual(centered);
+
+  await relogin();
+  await expect.poll(box).toEqual(moved);
+
+  // Turned off: back to the own card in the middle.
+  await page.getByRole('button', { name: 'Profile menu' }).last().click();
+  await page.getByText('Settings').click();
+  await page.getByRole('switch', { name: /Remember last position/ }).click();
+  await expect(page.getByRole('switch', { name: /Remember last position/ })).not.toBeChecked();
+  await expect.poll(savedZoom).toBeUndefined();
+  await page.goto('/home');
+  await relogin();
+  await expect.poll(box).toEqual(centered);
 });

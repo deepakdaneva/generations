@@ -1,4 +1,13 @@
-import { addRelative, deletePerson, RelationError, unlink, type Change, type People, type Relation } from './relations';
+import {
+  addRelative,
+  deletePerson,
+  pathTo,
+  RelationError,
+  unlink,
+  type Change,
+  type People,
+  type Relation,
+} from './relations';
 import type { Person } from './tree.service';
 
 /** Applies a change to a copy of `people`. */
@@ -94,5 +103,17 @@ describe('deletePerson', () => {
 
   it("refuses to delete the user's own card", () => {
     expect(() => deletePerson(tree, 'me', 'me')).toThrow(RelationError);
+  });
+});
+
+describe('pathTo', () => {
+  it('finds the shortest chain of relatives', () => {
+    add('me', 'parent', 'dad');
+    add('dad', 'parent', 'grandpa');
+    add('grandpa', 'child', 'uncle');
+    add('me', 'spouse', 'wife');
+    expect(pathTo(tree, 'me', 'uncle')).toEqual(['me', 'dad', 'grandpa', 'uncle']);
+    expect(pathTo(tree, 'me', 'me')).toEqual(['me']);
+    expect(pathTo(tree, 'me', 'nobody')).toBeNull();
   });
 });

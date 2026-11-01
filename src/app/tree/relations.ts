@@ -201,3 +201,23 @@ export function deletePerson(people: People, rootId: string, id: string): Change
   // Unreachable people are only linked to each other, so nothing else changes.
   return d.result([...people.keys()].filter((p) => !keep.has(p)));
 }
+
+/** Shortest chain of ids from `from` to `to` (both included), or null when not connected. */
+export function pathTo(people: People, from: string, to: string): string[] | null {
+  const prev = new Map<string, string>([[from, from]]);
+  const queue = [from];
+  for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+    if (id === to) {
+      const path = [to];
+      while (path[0] !== from) path.unshift(prev.get(path[0])!);
+      return path;
+    }
+    for (const n of neighbors(people.get(id) ?? { id, name: '' })) {
+      if (!prev.has(n) && people.has(n)) {
+        prev.set(n, id);
+        queue.push(n);
+      }
+    }
+  }
+  return null;
+}

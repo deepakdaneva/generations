@@ -117,6 +117,27 @@ service cloud.firestore {
         && data.updatedAt == request.time;
     }
 
+    // Tree settings: "remember last position" and the saved position (the person
+    // near the middle of the screen, the chain of ids to load them from the
+    // user's own card, the offset from their card and the zoom).
+    function validView(v) {
+      return v is map
+        && v.keys().hasOnly(['focus', 'path', 'dx', 'dy', 'z'])
+        && v.focus is string
+        && v.path is list && v.path.size() <= 100
+        && v.dx is number && v.dy is number
+        && v.z is number && v.z > 0 && v.z <= 4;
+    }
+
+    match /trees/{ownerId} {
+      allow read, delete: if isActive() && request.auth.uid == ownerId;
+      allow create, update: if isActive() && request.auth.uid == ownerId
+        && request.resource.data.keys().hasOnly(['rememberView', 'view', 'updatedAt'])
+        && request.resource.data.rememberView is bool
+        && (!('view' in request.resource.data) || validView(request.resource.data.view))
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /trees/{ownerId}/people/{personId} {
       allow read, delete: if isActive() && request.auth.uid == ownerId;
       allow create, update: if isActive() && request.auth.uid == ownerId && validPerson(request.resource.data);

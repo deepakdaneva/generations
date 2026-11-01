@@ -25,6 +25,8 @@ describe('HomePage', () => {
             photos: signal(new Map()),
             unloaded: signal(new Set(['gp'])),
             loadMore: async () => [],
+            loadSettings: async () => null,
+            rememberView: signal(false),
             rootId: 'u1',
             load: async () => undefined,
             loadPhoto: async () => undefined,

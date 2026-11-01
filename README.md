@@ -55,8 +55,12 @@ reasoning behind these choices.
   link (max 2 per day per device; also applies to "Forgot password?").
   Your picture appears on the profile button, in the profile menu and in the
   Users list.
-- **Settings** (profile button → Settings): theme choice of System default,
-  Light or Dark. Saved per device; System default follows the OS live.
+- **Settings page** (profile button → Settings):
+  - Theme: System default, Light or Dark. Saved per device; System default
+    follows the OS live.
+  - Remember last position (off by default, saved per account): the family
+    tree reopens where you left it, also after signing out and in or on
+    another device. When off, it always opens on your own card.
 - **About** (profile button → About, or the version link on the sign-in page):
   version, commit, deployment time, environment, source code, issues, security
   policy, license and copyright. Public, no sign-in needed.
@@ -77,7 +81,7 @@ reasoning behind these choices.
   - Large trees open fast: only your card and the 10 nearest people load
     first. Relatives further away show as placeholder cards and load in the
     background as you pan or zoom towards them.
-  - The "remember position" setting and encryption follow in later steps.
+  - Encryption follows in a later step.
 - **Installable app (PWA):** add it to the home screen on Android, iOS or
   desktop; it opens full screen, starts offline, and offers a reload when a new
   version is deployed.
@@ -101,6 +105,7 @@ reasoning behind these choices.
 │   │   ├── core/           Firebase setup, AuthService, route guards
 │   │   ├── home/           Home page (family-tree canvas: pan, zoom)
 │   │   ├── profile/        Profile page (name, picture, password reset link)
+│   │   ├── settings/       Settings page (theme, remember last position)
 │   │   ├── shared/         Floating menu and profile buttons (no header bar)
 │   │   ├── tree/           Family-tree data service, person card, edit form
 │   │   └── users/          User Management page (admins)
