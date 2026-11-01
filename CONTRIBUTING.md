@@ -52,6 +52,12 @@ changes.
 Use [Conventional Commits](https://www.conventionalcommits.org/), for example
 `feat: add registration page` or `fix: handle expired reset link`.
 
+Pull requests are squash-merged, so the **pull request title** becomes the
+commit message on `development` and must follow the same format. Release Please
+reads these titles to choose the next version (`fix:` → patch, `feat:` → minor,
+`feat!:` or `BREAKING CHANGE:` → major) and to write `CHANGELOG.md`. Titles
+like `docs:`, `ci:` or `chore:` do not change the version.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the

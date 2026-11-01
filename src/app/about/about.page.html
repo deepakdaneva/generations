@@ -16,10 +16,14 @@
     </section>
 
     <ion-list>
-      <ion-list-header><ion-label>Build</ion-label></ion-list-header>
+      <ion-list-header><ion-label>Version</ion-label></ion-list-header>
       <ion-item>
         <ion-label>Version</ion-label>
         <ion-note slot="end">{{ build.version ?? 'dev' }}</ion-note>
+      </ion-item>
+      <ion-item>
+        <ion-label>Build</ion-label>
+        <ion-note slot="end">{{ build.number ?? '–' }}</ion-note>
       </ion-item>
       <ion-item [href]="commitUrl" target="_blank" rel="noopener" [button]="!!commitUrl" [detail]="false">
         <ion-label>Commit</ion-label>
@@ -40,6 +44,9 @@
       </ion-item>
       <ion-item [href]="repo + '/issues'" target="_blank" rel="noopener" detail="true">
         <ion-label>Report a problem or suggest a feature</ion-label>
+      </ion-item>
+      <ion-item [href]="repo + '/releases'" target="_blank" rel="noopener" detail="true">
+        <ion-label>Release notes</ion-label>
       </ion-item>
       <ion-item [href]="repo + '/security/policy'" target="_blank" rel="noopener" detail="true">
         <ion-label>Security policy</ion-label>
