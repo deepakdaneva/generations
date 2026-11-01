@@ -147,7 +147,7 @@ async function approve(page: Page, email: string) {
   await login(page, 'admin@generations.test');
   await expect(page).toHaveURL(/\/home$/);
   await page.goto('/users');
-  await page.getByText(email).click();
+  await page.getByText(email, { exact: true }).click(); // not the toast that also names it
   await page.getByRole('button', { name: 'Activate account' }).click();
   await expect(page.locator('ion-item', { hasText: email }).getByText('Inactive')).toBeHidden();
   await page.getByRole('button', { name: 'Profile menu' }).last().click();
@@ -192,10 +192,11 @@ test('admin creates a user without a password; the user sets their own and signs
   await modal.locator('ion-input[formcontrolname=displayName] input').fill('Invited Member');
   await modal.locator('ion-input[formcontrolname=email] input').fill(email);
   await modal.getByRole('button', { name: 'Create user' }).click();
-  await expect(page.getByText(email)).toBeVisible();
+  await expect(page.getByText(email, { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Profile menu' }).last().click();
   await page.getByText('Logout').click();
+  await expect(page).toHaveURL(/\/login$/); // signed out before the next sign-in
 
   // The invited user sets a password from the email, then signs in.
   await setPasswordFromEmail(email);
@@ -224,14 +225,15 @@ test('admin creates a user, deactivates them, and the user is blocked', async ({
   await modal.locator('ion-input[formcontrolname=displayName] input').fill('Managed Member');
   await modal.locator('ion-input[formcontrolname=email] input').fill(email);
   await modal.getByRole('button', { name: 'Create user' }).click();
-  await expect(page.getByText(email)).toBeVisible();
+  await expect(page.getByText(email, { exact: true })).toBeVisible();
 
-  await page.getByText(email).click();
+  await page.getByText(email, { exact: true }).click(); // not the toast that also names it
   await page.getByRole('button', { name: 'Deactivate account' }).click();
   await expect(page.locator('ion-item', { hasText: email }).getByText('Inactive')).toBeVisible();
 
   await page.getByRole('button', { name: 'Profile menu' }).last().click();
   await page.getByText('Logout').click();
+  await expect(page).toHaveURL(/\/login$/); // signed out before the next sign-in
 
   await setPasswordFromEmail(email);
   await fetch(`${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/projects/demo-generations/accounts:update`, {
@@ -339,6 +341,7 @@ test('profile page: picture is cropped, shrunk and shown; name editable; email l
   // The same limit applies to "Forgot password?" on the sign-in page.
   await page.getByRole('button', { name: 'Profile menu' }).last().click();
   await page.getByText('Logout').click();
+  await expect(page).toHaveURL(/\/login$/); // signed out before the next sign-in
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await page.locator('ion-alert input').fill('user@generations.test');
   await page.getByRole('button', { name: 'Send link' }).click();
@@ -687,6 +690,7 @@ test('family tree: "Remember last position" reopens where the user left, only wh
   const relogin = async () => {
     await page.getByRole('button', { name: 'Profile menu' }).last().click();
     await page.getByText('Logout').click();
+    await expect(page).toHaveURL(/\/login$/); // signed out before the next sign-in
     await login(page, email);
     await expect(me).toBeVisible();
   };
@@ -776,6 +780,7 @@ test('admins are notified of new accounts, and approve them from the notificatio
   // Approved: the new user can sign in.
   await page.getByRole('button', { name: 'Profile menu' }).filter({ visible: true }).click();
   await page.getByText('Logout').click();
+  await expect(page).toHaveURL(/\/login$/); // signed out before the next sign-in
   await login(page, email);
   await expect(page).toHaveURL(/\/home$/);
 });
