@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/deepakdaneva/generations/compare/v0.2.0...v0.3.0) (2026-11-01)
+
+
+### Features
+
+* person profile popup, memorial cards, marriage lines and leaf-only delete ([#10](https://github.com/deepakdaneva/generations/issues/10)) ([0d4ef77](https://github.com/deepakdaneva/generations/commit/0d4ef77bc9c478f426e030d9388055f85e826330))
+
 ## [0.2.0](https://github.com/deepakdaneva/generations/compare/v0.1.0...v0.2.0) (2026-11-01)
 
 
