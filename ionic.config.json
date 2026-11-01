@@ -1,0 +1,7 @@
+{
+  "name": "generations",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}

@@ -1,0 +1,14 @@
+<ion-content>
+  <app-top-actions></app-top-actions>
+
+  <!-- Placeholder for the family-tree canvas (planned for a later iteration). -->
+  <section class="tree-canvas" aria-label="Family tree canvas">
+    <div class="tree-placeholder">
+      <ion-icon name="git-network-outline" color="medium" aria-hidden="true"></ion-icon>
+      <h2>Welcome, {{ auth.profile()?.displayName }}</h2>
+      <ion-text color="medium">
+        <p>Your family tree will appear here.</p>
+      </ion-text>
+    </div>
+  </section>
+</ion-content>

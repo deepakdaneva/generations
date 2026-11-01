@@ -1,0 +1,65 @@
+<ion-content class="auth-page">
+  <div class="auth-wrapper">
+    <div class="auth-brand">
+      <ion-icon name="git-network-outline" aria-hidden="true"></ion-icon>
+      <h1>Generations</h1>
+      <p>Every family has a story. Keep yours together.</p>
+    </div>
+
+    <ion-card>
+      <ion-card-content>
+        @if (inactive() === 'inactive') {
+        <ion-text color="danger">
+          <p class="ion-padding-bottom">
+            Your account isn't active. New accounts need an administrator's approval, and accounts can be deactivated.
+            Please contact an administrator.
+          </p>
+        </ion-text>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="submit()">
+          <ion-input
+            formControlName="email"
+            type="email"
+            label="Email"
+            labelPlacement="floating"
+            fill="outline"
+            autocomplete="email"
+            errorText="Enter a valid email address"
+          ></ion-input>
+
+          <ion-input
+            class="ion-margin-top"
+            formControlName="password"
+            type="password"
+            label="Password"
+            labelPlacement="floating"
+            fill="outline"
+            autocomplete="current-password"
+            errorText="Enter your password"
+          >
+            <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+          </ion-input>
+
+          <ion-button class="ion-margin-top" type="submit" expand="block" [disabled]="busy()">
+            @if (busy()) {
+            <ion-spinner name="crescent"></ion-spinner>
+            } @else { Sign in }
+          </ion-button>
+        </form>
+
+        <app-google-button></app-google-button>
+
+        <ion-button fill="clear" expand="block" size="small" (click)="forgotPassword()">Forgot password?</ion-button>
+      </ion-card-content>
+    </ion-card>
+
+    <p class="auth-switch">New here? <a routerLink="/register">Create an account</a></p>
+    <p class="recaptcha-notice">
+      This site is protected by reCAPTCHA and the Google
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> and
+      <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Terms of Service</a> apply.
+    </p>
+    <p class="recaptcha-notice">Generations {{ appVersion }}</p>
+  </div>
+</ion-content>

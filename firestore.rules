@@ -1,0 +1,95 @@
+rules_version = '2';
+
+// Authorization for Generations. The UI hides things for convenience; these
+// rules are what actually protect the data. See docs/ARCHITECTURE.md.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActive() {
+      return verified()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && profile().active == true;
+    }
+
+    function isAdmin() {
+      return isActive() && profile().role == 'admin';
+    }
+
+    function validName(name) {
+      return name is string && name.size() > 0 && name.size() <= 100;
+    }
+
+    // Profile picture: a small square image embedded as a data URL (Cloud
+    // Storage needs the paid plan). The app sends 256x256 images of ~15-30 KB;
+    // the cap keeps anyone from filling the database with big files.
+    function validPhoto(data) {
+      return !('photo' in data)
+        || (data.photo is string
+          && data.photo.size() <= 70000
+          && data.photo.matches('data:image/(jpeg|webp);base64,[A-Za-z0-9+/=]+'));
+    }
+
+    function validUser(data) {
+      return data.keys().hasOnly(['email', 'displayName', 'role', 'active', 'createdAt'])
+        && data.email is string
+        && validName(data.displayName)
+        && data.role in ['admin', 'user']
+        && data.active is bool
+        && data.createdAt == request.time;
+    }
+
+    match /users/{userId} {
+      // Users can always read their own profile (even when deactivated, so the
+      // app can tell them); admins can read everyone.
+      allow get: if (verified() && request.auth.uid == userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Self-registration: a verified user creates their own profile, always as
+      // a normal user waiting for approval (inactive) until an admin activates
+      // it. Admins can create profiles for others (active or not).
+      allow create: if validUser(request.resource.data) && (
+        (verified()
+          && request.auth.uid == userId
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.role == 'user'
+          && request.resource.data.active == false)
+        || (isAdmin() && request.auth.uid != userId)
+      );
+
+      // Active users edit their own name and picture (never email, role or
+      // status). Admins change other users' name, role and status, never their
+      // own role or status.
+      allow update: if (
+          isActive()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photo'])
+          && validName(request.resource.data.displayName)
+          && validPhoto(request.resource.data)
+        ) || (
+          isAdmin()
+          && request.auth.uid != userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'role', 'active'])
+          && validName(request.resource.data.displayName)
+          && request.resource.data.role in ['admin', 'user']
+          && request.resource.data.active is bool
+        );
+
+      // No deletes: without the Admin SDK the Auth account would remain, and the
+      // user could recreate their profile. Deactivate instead.
+      allow delete: if false;
+    }
+
+    // Everything else is denied until a feature defines its own rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

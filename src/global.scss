@@ -1,0 +1,112 @@
+/*
+ * App Global CSS
+ * ----------------------------------------------------------------------------
+ * Put style rules here that you want to apply globally. These styles are for
+ * the entire app and not just one component. Additionally, this file can be
+ * used as an entry point to import other CSS/Sass files to be included in the
+ * output CSS.
+ * For more information on global stylesheets, visit the documentation:
+ * https://ionicframework.com/docs/layout/global-stylesheets
+ */
+
+/* Core CSS required for Ionic components to work properly */
+@import '@ionic/angular/css/core.css';
+
+/* Basic CSS for apps built with Ionic */
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+@import '@ionic/angular/css/display.css';
+
+/* Optional CSS utils that can be commented out */
+@import '@ionic/angular/css/padding.css';
+@import '@ionic/angular/css/float-elements.css';
+@import '@ionic/angular/css/text-alignment.css';
+@import '@ionic/angular/css/text-transformation.css';
+@import '@ionic/angular/css/flex-utils.css';
+
+/**
+ * Ionic Dark Mode
+ * -----------------------------------------------------
+ * For more info, please see:
+ * https://ionicframework.com/docs/theming/dark-mode
+ */
+
+/* Dark palette is applied by ThemeService (src/app/core/theme.ts) via the
+   .ion-palette-dark class, so users can choose System / Light / Dark. */
+@import '@ionic/angular/css/palettes/dark.class.css';
+
+/* Sign-in and registration pages */
+.auth-page {
+  --background: linear-gradient(160deg, var(--ion-color-primary) 0%, var(--ion-color-tertiary) 100%);
+}
+
+/* Dark theme: deeper gradient so the white brand text stays readable. */
+.ion-palette-dark .auth-page {
+  --background: linear-gradient(160deg, #102a5c 0%, #3b1a6b 100%);
+}
+
+.auth-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 24px 8px;
+}
+
+.auth-brand {
+  text-align: center;
+  color: #fff;
+
+  ion-icon {
+    font-size: 64px;
+  }
+
+  h1 {
+    margin: 8px 0 4px;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 0 0 16px;
+    opacity: 0.9;
+  }
+}
+
+.auth-switch {
+  text-align: center;
+  color: #fff;
+
+  a {
+    color: inherit;
+    font-weight: 600;
+  }
+}
+
+.auth-sent-icon {
+  font-size: 48px;
+}
+
+/* Highlight the current page in the admin menu */
+ion-menu ion-item.selected {
+  --color: var(--ion-color-primary);
+}
+
+/* reCAPTCHA (App Check) badge would cover the floating buttons; the required
+   notice is shown on the sign-in and registration pages instead. */
+.grecaptcha-badge {
+  visibility: hidden;
+}
+
+.recaptcha-notice {
+  margin: 12px 0 0;
+  font-size: 0.75em;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
+
+  a {
+    color: inherit;
+  }
+}

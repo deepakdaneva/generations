@@ -1,0 +1,94 @@
+<ion-content>
+  <app-top-actions></app-top-actions>
+
+  <div class="profile">
+    <section class="photo">
+      <ion-avatar class="photo-large">
+        @if (auth.profile()?.photo; as photo) {
+        <img [src]="photo" alt="Your profile picture" />
+        } @else {
+        <ion-icon name="person-circle" color="medium" aria-hidden="true"></ion-icon>
+        }
+      </ion-avatar>
+
+      <input #fileInput type="file" accept="image/*" hidden (change)="pickPhoto(fileInput)" />
+      <div class="photo-actions">
+        <ion-button size="small" fill="outline" [disabled]="savingPhoto()" (click)="fileInput.click()">
+          @if (savingPhoto()) {
+          <ion-spinner name="crescent"></ion-spinner>
+          } @else {
+          <ion-icon slot="start" name="camera-outline" aria-hidden="true"></ion-icon>
+          {{ auth.profile()?.photo ? 'Change photo' : 'Add photo' }} }
+        </ion-button>
+        @if (auth.profile()?.photo) {
+        <ion-button size="small" fill="clear" color="medium" [disabled]="savingPhoto()" (click)="removePhoto()">
+          <ion-icon slot="start" name="trash-outline" aria-hidden="true"></ion-icon>
+          Remove
+        </ion-button>
+        }
+      </div>
+      <ion-note>Any photo works: it is cropped to a square and shrunk on your device before upload.</ion-note>
+    </section>
+
+    <ion-list>
+      <ion-list-header><ion-label>Profile</ion-label></ion-list-header>
+      <ion-item lines="none">
+        <ion-input
+          [formControl]="name"
+          label="Name"
+          labelPlacement="floating"
+          fill="outline"
+          autocomplete="name"
+          errorText="Enter your name (up to 100 characters)"
+        ></ion-input>
+      </ion-item>
+      <ion-item lines="none">
+        <ion-button slot="end" [disabled]="name.pristine || name.invalid || savingName()" (click)="saveName()">
+          @if (savingName()) {
+          <ion-spinner name="crescent"></ion-spinner>
+          } @else { Save name }
+        </ion-button>
+      </ion-item>
+      <ion-item lines="none">
+        <ion-input
+          [value]="auth.profile()?.email"
+          label="Email"
+          labelPlacement="floating"
+          fill="outline"
+          readonly
+          helperText="Your email can't be changed."
+        ></ion-input>
+      </ion-item>
+
+      <ion-list-header><ion-label>Password</ion-label></ion-list-header>
+      @if (hasPassword) {
+      <ion-item lines="none">
+        <ion-label class="ion-text-wrap">
+          <p>We'll email you a link to choose a new password.</p>
+          <p>
+            <ion-text color="medium">{{ resetsLeft() }} of {{ perDay }} links left today on this device.</ion-text>
+          </p>
+        </ion-label>
+      </ion-item>
+      <ion-item lines="none">
+        <ion-button
+          slot="end"
+          fill="outline"
+          [disabled]="resetsLeft() === 0 || sendingReset()"
+          (click)="sendResetLink()"
+        >
+          @if (sendingReset()) {
+          <ion-spinner name="crescent"></ion-spinner>
+          } @else { Send password reset link }
+        </ion-button>
+      </ion-item>
+      } @else {
+      <ion-item lines="none">
+        <ion-label class="ion-text-wrap">
+          <p>You sign in with Google, so there is no Generations password to change.</p>
+        </ion-label>
+      </ion-item>
+      }
+    </ion-list>
+  </div>
+</ion-content>

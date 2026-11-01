@@ -1,0 +1,205 @@
+import { Component, inject, signal, viewChild } from '@angular/core';
+import { Router } from '@angular/router';
+import {
+  IonAvatar,
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonHeader,
+  IonIcon,
+  IonItem,
+  IonLabel,
+  IonList,
+  IonListHeader,
+  IonMenuButton,
+  IonModal,
+  IonPopover,
+  IonRadio,
+  IonRadioGroup,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { logOutOutline, personCircle, settingsOutline } from 'ionicons/icons';
+
+import { AuthService } from '../core/auth.service';
+import { ThemeService, type ThemeMode } from '../core/theme';
+import { appVersion } from '../core/version';
+
+/**
+ * Header-less page chrome: a floating menu button (only shown to admins, via the
+ * menu's disabled state) and a profile button. Place it inside <ion-content>;
+ * anything projected into it (e.g. a search bar) sits between the two buttons.
+ */
+@Component({
+  selector: 'app-top-actions',
+  host: { slot: 'fixed' },
+  template: `
+    <div class="top-actions">
+      <ion-menu-button></ion-menu-button>
+      <div class="middle"><ng-content></ng-content></div>
+      <ion-button fill="clear" shape="round" (click)="openProfile($event)" aria-label="Profile menu">
+        @if (auth.profile()?.photo; as photo) {
+          <ion-avatar slot="icon-only" class="profile-button-avatar"><img [src]="photo" alt="" /></ion-avatar>
+        } @else {
+          <ion-icon slot="icon-only" name="person-circle"></ion-icon>
+        }
+      </ion-button>
+    </div>
+
+    <ion-popover #profilePopover [isOpen]="profileOpen()" [event]="profileEvent" (didDismiss)="profileOpen.set(false)">
+      <ng-template>
+        <ion-content>
+          <ion-list lines="none">
+            <ion-item button detail="false" (click)="openProfilePage()" aria-label="Open your profile">
+              <ion-avatar slot="start">
+                @if (auth.profile()?.photo; as photo) {
+                  <img [src]="photo" alt="" />
+                } @else {
+                  <ion-icon name="person-circle" color="medium" class="menu-avatar-icon"></ion-icon>
+                }
+              </ion-avatar>
+              <ion-label>
+                <h2>{{ auth.profile()?.displayName }}</h2>
+                <p>{{ auth.profile()?.email }}</p>
+              </ion-label>
+            </ion-item>
+            <ion-item button detail="false" (click)="openSettings()">
+              <ion-icon slot="start" name="settings-outline" aria-hidden="true"></ion-icon>
+              <ion-label>Settings</ion-label>
+            </ion-item>
+            <ion-item button detail="false" (click)="logout()">
+              <ion-icon slot="start" name="log-out-outline" aria-hidden="true"></ion-icon>
+              <ion-label>Logout</ion-label>
+            </ion-item>
+          </ion-list>
+          <p class="app-version">Generations {{ appVersion }}</p>
+        </ion-content>
+      </ng-template>
+    </ion-popover>
+
+    <ion-modal [isOpen]="settingsOpen()" (didDismiss)="settingsOpen.set(false)">
+      <ng-template>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Settings</ion-title>
+            <ion-buttons slot="end">
+              <ion-button (click)="settingsOpen.set(false)">Close</ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <ion-list>
+            <ion-list-header><ion-label>Theme</ion-label></ion-list-header>
+            <ion-radio-group [value]="theme.mode()" (ionChange)="theme.setMode($event.detail.value)">
+              @for (option of themes; track option.value) {
+                <ion-item>
+                  <ion-radio [value]="option.value">{{ option.label }}</ion-radio>
+                </ion-item>
+              }
+            </ion-radio-group>
+          </ion-list>
+        </ion-content>
+      </ng-template>
+    </ion-modal>
+  `,
+  styles: `
+    :host {
+      top: 0;
+      left: 0;
+      right: 0;
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: calc(var(--ion-safe-area-top, 0px) + 4px) 4px 4px;
+      background: var(--top-actions-background, transparent);
+    }
+    .profile-button-avatar {
+      width: 32px;
+      height: 32px;
+    }
+    .app-version {
+      margin: 0 16px 12px;
+      font-size: 0.75em;
+      color: var(--ion-color-medium);
+    }
+    .menu-avatar-icon {
+      width: 100%;
+      height: 100%;
+    }
+    .middle {
+      flex: 1;
+      min-width: 0;
+    }
+    ion-button {
+      --padding-start: 4px;
+      --padding-end: 4px;
+      font-size: 18px;
+      margin-left: auto;
+    }
+  `,
+  imports: [
+    IonAvatar,
+    IonButton,
+    IonButtons,
+    IonContent,
+    IonHeader,
+    IonIcon,
+    IonItem,
+    IonLabel,
+    IonList,
+    IonListHeader,
+    IonMenuButton,
+    IonModal,
+    IonPopover,
+    IonRadio,
+    IonRadioGroup,
+    IonTitle,
+    IonToolbar,
+  ],
+})
+export class TopActionsComponent {
+  protected readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  protected readonly appVersion = appVersion;
+
+  protected readonly theme = inject(ThemeService);
+  protected readonly themes: { value: ThemeMode; label: string }[] = [
+    { value: 'system', label: 'System default' },
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+  ];
+
+  protected readonly profileOpen = signal(false);
+  private readonly profilePopover = viewChild.required<IonPopover>('profilePopover');
+  protected readonly settingsOpen = signal(false);
+  protected profileEvent?: Event;
+
+  constructor() {
+    addIcons({ personCircle, logOutOutline, settingsOutline });
+  }
+
+  openProfile(event: Event): void {
+    this.profileEvent = event;
+    this.profileOpen.set(true);
+  }
+
+  async openProfilePage(): Promise<void> {
+    // Close the popover fully first; otherwise its overlay stays over the new page.
+    await this.profilePopover().dismiss();
+    await this.router.navigateByUrl('/profile');
+  }
+
+  openSettings(): void {
+    this.profileOpen.set(false);
+    this.settingsOpen.set(true);
+  }
+
+  async logout(): Promise<void> {
+    this.profileOpen.set(false);
+    await this.auth.logout();
+    await this.router.navigateByUrl('/login', { replaceUrl: true });
+  }
+}

@@ -1,0 +1,29 @@
+.profile {
+  max-width: 560px;
+  margin: 0 auto;
+  padding-top: calc(var(--ion-safe-area-top, 0px) + 56px);
+}
+
+.photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.photo-large {
+  width: 128px;
+  height: 128px;
+
+  ion-icon {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.photo-actions {
+  display: flex;
+  gap: 4px;
+}

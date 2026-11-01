@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "demo-generations",
+    "uat": "generations-uat",
+    "prod": "generations-prod"
+  }
+}

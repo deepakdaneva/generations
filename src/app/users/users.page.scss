@@ -1,0 +1,12 @@
+// The floating search row needs a background so the list scrolls under it cleanly.
+app-top-actions.solid {
+  --top-actions-background: var(--ion-background-color, #fff);
+}
+
+.top-spacer {
+  height: calc(var(--ion-safe-area-top, 0px) + 64px);
+}
+
+ion-searchbar {
+  padding: 0;
+}

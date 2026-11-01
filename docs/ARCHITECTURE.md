@@ -1,0 +1,276 @@
+# Architecture
+
+This document describes how Generations is built and why. Update it whenever an
+architectural decision changes.
+
+## Overview
+
+```text
+ Browser / PWA  (later: Capacitor iOS & Android shells)
+ ┌──────────────────────────────────────────────┐
+ │ Ionic 9 + Angular 22 (standalone components) │
+ │  pages ─ services ─ route guards             │
+ │  Firebase JS SDK (modular)                   │
+ └───────────────┬──────────────────────────────┘
+                 │ HTTPS
+ ┌───────────────┴──────────────────────────────┐
+ │ Firebase (Spark plan)                        │
+ │  Hosting · Authentication · Firestore        │
+ │  Firestore Security Rules = authorization    │
+ └──────────────────────────────────────────────┘
+```
+
+There is no application server. The client talks directly to Firebase, and
+every authorization decision is enforced by Firestore Security Rules.
+
+## Decisions
+
+### D1. Firebase Spark plan only, no backend
+
+Everything must work on the free Spark plan. Cloud Functions require the paid
+Blaze plan, so the app does not use them and does not use the Firebase Admin
+SDK at runtime. Consequences are listed in
+[Authentication and user management](#authentication-and-user-management).
+
+Revisit only when a feature genuinely needs Blaze, and only with the
+maintainer's explicit approval.
+
+### D2. Ionic 9 + Angular 22, standalone components
+
+Angular is Ionic's primary integration and ships the router, forms, HTTP client
+and service worker in the box, which keeps third-party dependencies to a
+minimum. Standalone components and lazy-loaded routes keep the code modular.
+
+### D3. Capacitor for future native apps
+
+The project already includes Capacitor 8 configuration
+(`capacitor.config.ts`, app id `io.github.deepakdaneva.generations`). Native iOS and
+Android projects are added later with `npx cap add ios|android`; the web code
+stays the same.
+
+### D4. Modular Firebase JS SDK, no AngularFire
+
+The official modular Firebase JS SDK is Google's recommended web SDK, is
+tree-shakeable, and works inside Capacitor's native WebView. AngularFire was
+rejected because it is an extra dependency that lags Angular releases (at the
+time of writing it supports Angular 21, not 22).
+
+For native builds, Auth is initialized with `initializeAuth` and
+`indexedDBLocalPersistence` so sessions persist inside the WebView. Email +
+password sign-in needs no native plugin.
+
+### D5. Roles in Firestore, not custom claims
+
+Custom claims can only be set with the Admin SDK (a backend). Roles and account
+status are therefore stored in a Firestore document per user, and Security
+Rules read that document with `get()`.
+
+### D6. Environments selected by configuration
+
+Local (emulators), UAT and Production each have their own Firebase project.
+Production deployment stays disabled until explicitly requested.
+
+| Environment | Firebase project | Build | Web config source |
+|---|---|---|---|
+| Local | `demo-generations` (emulators only) | development | `src/environments/environment.ts` |
+| UAT | `generations-uat` (alias `uat`) | production | `/__/firebase/init.json` |
+| Production | `generations-prod` (alias `prod`) | production | `/__/firebase/init.json` |
+
+Deployed builds contain no project configuration. At startup the app fetches
+`/__/firebase/init.json`, a reserved URL that Firebase Hosting serves with the
+config of the project it is deployed to. One build artifact therefore works
+for UAT, Production and forks, and switching environments means choosing a
+different `firebase deploy --project` target, not editing code.
+
+Native builds (later) have no Hosting origin; they will fetch the same file
+from the deployed site or have the config written in at build time.
+`src/app/core/firebase.ts` is the only place that needs to change.
+
+### D9. Installable PWA
+
+`@angular/service-worker` (added with `ng add @angular/pwa`) makes the app
+installable and lets it start offline. Production builds only; it is off in
+development.
+
+- `public/manifest.webmanifest`: name, colors, start URL, icons (regular and
+  maskable). `public/icons/` is rendered from one SVG design by
+  `node scripts/generate-icons.mjs`.
+- `ngsw-config.json`: prefetches the app shell; never serves it for Firebase's
+  reserved `/__/` URLs; caches `/__/firebase/init.json` (network first) so the
+  app can start offline.
+- Hosting sends `Cache-Control: no-cache` for `index.html`, `ngsw-worker.js`,
+  `ngsw.json` and the manifest so updates are picked up; hashed JS/CSS are
+  cached for a year.
+- When a new version is downloaded, the app shows a "Reload" toast.
+
+Signing in and loading data still need a connection (Firestore offline
+persistence is not enabled).
+
+### D12. Security headers
+
+`firebase.json` sends a Content-Security-Policy that allows scripts only from
+the app itself, Google's sign-in (`apis.google.com`) and reCAPTCHA; frames only
+from `*.firebaseapp.com` (sign-in) and reCAPTCHA; network calls only to the app,
+`*.googleapis.com` and Google; and forbids framing the app (`frame-ancestors
+'none'`, `X-Frame-Options: DENY`). Inline styles are allowed because Ionic
+injects them at runtime; inline scripts are not, which is why Angular's
+critical-CSS inlining (`inlineCritical`) is turned off. When adding a new
+external service, extend the policy and re-test sign-in, Google sign-in and App
+Check on UAT.
+
+### D11. Profile pictures without Cloud Storage
+
+Cloud Storage for Firebase requires the Blaze plan for new projects (since
+October 2024), so pictures are stored in the user's Firestore document
+instead. `src/app/core/avatar.ts` center-crops any picked image to a square,
+scales it to 256x256 and compresses it (WebP, JPEG fallback) until it is under
+60,000 characters, all in the browser; the original never leaves the device.
+The rules cap `photo` at 70,000 characters and only accept JPEG/WebP data
+URLs. At ~20-40 KB per user this fits the 1 GiB free Firestore storage for any
+family-sized group. Users list documents carry the picture, so no extra reads
+are needed to show avatars.
+
+User-triggered password-reset emails (profile page and "Forgot password?") are
+limited to 2 per email per day per device (`src/app/core/reset-limit.ts`,
+browser storage). This protects the daily email quota from casual repeats; it
+is not a security boundary, because a server-side limit would need a backend.
+Admin-triggered reset emails are not limited. Google-only accounts have no
+password, so the profile page shows a note instead of the reset button.
+
+### D10. Link previews and SEO
+
+`src/index.html` carries the title, description, Open Graph and Twitter card
+tags, so shared links (WhatsApp, Facebook, LinkedIn, X, Slack, bookmarks) show
+the name, description and `public/og-image.jpg` (1200×630, rendered by
+`scripts/generate-icons.mjs`). Link previews need absolute URLs, which differ
+per environment, so the tags use `__SITE_URL__` / `__ROBOTS__` placeholders.
+The Hosting predeploy hook `scripts/prepare-hosting.mjs` fills them for the
+target project (`https://<project>.web.app`, or `SITE_URL` for a custom
+domain), marks test projects (`-uat`, `-dev`, `-test`, `-staging`) as
+`noindex`, and regenerates `ngsw.json` so the service worker hashes still
+match. Apps that preview links cache them; changes can take time to show.
+
+### D8. Theme (System / Light / Dark)
+
+Ionic's class-based dark palette (`dark.class.css`) is used instead of the
+system-only one, so the app can override the OS. `src/app/core/theme.ts`
+toggles the `.ion-palette-dark` class on `<html>`, follows OS changes when
+"System default" is chosen, and stores the choice in `localStorage` (per
+device, also before sign-in). `main.ts` applies it before Angular starts to
+avoid a light flash. The preference is deliberately per device (maintainer
+decision); syncing it per account would need a Firestore field and a rules
+change.
+
+### D7. Local development on the Emulator Suite
+
+`npm run dev` runs `firebase emulators:exec`, which starts the Auth and
+Firestore emulators and then the Angular dev server, and stops everything
+together. The `demo-` project id guarantees that local runs can never reach
+real Firebase services. `scripts/emulators-exec.mjs` wraps that command and
+stops the Firestore emulator afterwards through its `/shutdown` endpoint,
+because on Windows the Firebase CLI leaves the emulator's Java process running. `firebase-tools` is a pinned dev dependency so every
+developer and CI run uses the same CLI version.
+
+Docker (`Dockerfile`, `compose.yaml`) packages the same stack into one
+container with Node 24 and Java 21. Emulator data is exported on shutdown
+(`SIGINT`) into a named volume.
+
+## Authentication and user management
+
+Validated against the Spark plan:
+
+| Capability | Spark | Implementation |
+|---|---|---|
+| Email + password sign-in | Yes | Firebase Auth email provider |
+| Self-registration | Yes | `createUserWithEmailAndPassword` |
+| Email verification | Yes | `sendEmailVerification`; sign-in is refused until `emailVerified` is true |
+| Password reset | Yes | `sendPasswordResetEmail` (by the user, or triggered by an admin) |
+| Roles (Admin / User) | Yes | `users/{uid}` Firestore document, enforced by Security Rules |
+| Admin creates users | Yes | Secondary Firebase app instance, so the admin stays signed in |
+| Activate / deactivate | Partly | `active` flag; rules deny all access when false and the app signs the user out. The Auth account itself stays enabled (disabling it needs the Admin SDK). |
+| Admin sets another user's password | No | Needs the Admin SDK. Admins send a reset email instead. |
+| Phone sign-in | Out of scope | SMS sign-in requires a billing account. |
+| Blocking sign-up at the Auth level | No | Anyone can create an Auth account, but without a verified email and an active `users/{uid}` document it has no data access. |
+
+### Spark quotas to keep in mind
+
+Firebase Auth on Spark sends at most about **1,000 verification emails** and
+**150 password-reset emails per day**. Check the current
+[Auth limits](https://firebase.google.com/docs/auth/limits) before relying on
+these numbers.
+
+### Data model
+
+```text
+users/{uid}
+  email:       string
+  displayName: string
+  role:        "admin" | "user"
+  active:      boolean
+  createdAt:   timestamp
+  photo?:      string   (256x256 WebP/JPEG data URL, at most 70,000 characters)
+```
+
+### Security rules (`firestore.rules`)
+
+- All access requires a signed-in user with `email_verified == true`.
+- Users can read their own profile, even when deactivated, so the app can tell
+  them. Only active admins can read or list everyone.
+- A verified user may create **their own** profile only as `role: "user"`,
+  `active: false` (waiting for approval), with their own email. Active admins may create profiles for
+  others with any role.
+- Active users can update their own `displayName` and `photo` only (never
+  email, role or status). `photo` must be a JPEG/WebP data URL of at most
+  70,000 characters.
+- Active admins can update other users' `displayName`, `role` and `active`,
+  never their own role or status (so an admin cannot lock themselves out).
+- Profiles are never deleted: the Auth account would remain and could recreate
+  its profile. Deactivate instead.
+- Every other path is denied.
+
+`tests/rules/firestore.rules.spec.ts` covers these cases against the Firestore
+emulator (`npm run test:rules`).
+
+### Sign-in flow (`src/app/core/auth.service.ts`)
+
+1. **Register:** create the Auth account, set the display name, send the
+   verification email, sign out.
+2. **Sign in:** if the email is not verified, sign out again and offer to
+   resend the verification email.
+3. **First verified sign-in:** the app creates the user's profile
+   (`role: "user"`, `active: false`); the rules enforce those values. The
+   account **waits for an admin to activate it** (Users page → Activate), so
+   strangers cannot join a family's data just by registering. The app waits
+   for the server to confirm that write before signing the user out.
+4. **While signed in:** the app listens to the profile. If an admin
+   deactivates the account, the user is signed out at once and shown why. Role
+   changes apply immediately.
+5. **Google sign-in:** `signInWithPopup` with the Google provider. Google
+   accounts arrive with a verified email, so step 3 applies immediately. If the
+   email already has a password account, Firebase's one-account-per-email
+   setting decides; the app shows a clear message for
+   `auth/account-exists-with-different-credential`. Popups do not work inside
+   Capacitor's native WebView, so native apps will need a native sign-in plugin.
+6. **Admin creates a user:** the admin enters only name, email and role. A
+   temporary second Firebase app instance creates the account with a random
+   password nobody sees (so the admin stays signed in), the admin writes the
+   profile, and the new user gets a "set your password" (password reset)
+   email. If Firebase does not treat that link as email verification, the
+   normal verify step at sign-in applies. Gmail users can also just use Google.
+
+Route guards (`src/app/core/guards.ts`) only steer navigation; the rules are
+the real protection.
+
+### First admin
+
+Rules cannot let a user promote themselves, so the first admin is set up once
+by the project owner in the Firebase console, which bypasses rules. No script,
+Admin SDK or backend is needed:
+
+1. Register in the app with the admin's email and open the verification link.
+2. Sign in once. The app creates the profile `users/{uid}` with `role: "user"`.
+3. In the Firebase console, open **Firestore → users → {uid}** and change
+   `role` to `admin`.
+
+After that, admins promote other users from the User Management page.
+Locally, `npm run seed` creates a ready-made admin in the emulators.
