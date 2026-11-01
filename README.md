@@ -57,6 +57,9 @@ reasoning behind these choices.
   Users list.
 - **Settings** (profile button → Settings): theme choice of System default,
   Light or Dark. Saved per device; System default follows the OS live.
+- **About** (profile button → About, or the version link on the sign-in page):
+  version, commit, deployment time, environment, source code, issues, security
+  policy, license and copyright. Public, no sign-in needed.
 - Home page with a placeholder canvas for the future family tree.
 - **Installable app (PWA):** add it to the home screen on Android, iOS or
   desktop; it opens full screen, starts offline, and offers a reload when a new
@@ -76,6 +79,7 @@ reasoning behind these choices.
 ├── e2e/                    Playwright end-to-end tests
 ├── src/
 │   ├── app/
+│   │   ├── about/          About page (version, commit, links, license)
 │   │   ├── auth/           Sign-in and registration pages
 │   │   ├── core/           Firebase setup, AuthService, route guards
 │   │   ├── home/           Home page (family-tree canvas placeholder)

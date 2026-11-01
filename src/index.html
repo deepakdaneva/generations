@@ -9,9 +9,12 @@
     />
 
     <!-- Link previews (WhatsApp, Facebook, LinkedIn, X, Slack...) and search.
-         __SITE_URL__, __ROBOTS__ and __APP_VERSION__ are filled in per Firebase
-         project at deploy time by scripts/prepare-hosting.mjs. -->
+         __SITE_URL__, __ROBOTS__ and the __APP_*__ build details are filled in per
+         Firebase project at deploy time by scripts/prepare-hosting.mjs. -->
     <meta name="app-version" content="__APP_VERSION__" />
+    <meta name="app-commit" content="__APP_COMMIT__" />
+    <meta name="app-built" content="__APP_BUILT__" />
+    <meta name="app-project" content="__APP_PROJECT__" />
     <meta name="robots" content="__ROBOTS__" />
     <link rel="canonical" href="__SITE_URL__/" />
     <meta property="og:type" content="website" />
