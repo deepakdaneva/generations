@@ -4,12 +4,43 @@ import { execFileSync } from 'node:child_process';
 // Runs against the Firebase emulators started by playwright.config.ts.
 const AUTH_EMULATOR = 'http://127.0.0.1:9099';
 const PASSWORD = 'Passw0rd!';
+const FIRESTORE_DOCS = 'http://127.0.0.1:8080/v1/projects/demo-generations/databases/(default)/documents';
+/** The emulators' built-in admin token; it bypasses security rules. */
+const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(() => {
   execFileSync('node', ['scripts/seed-emulators.mjs'], { stdio: 'inherit' });
 });
+
+/**
+ * A new, verified, active account with an empty family tree. Tests that build
+ * a tree use their own account, so a retried test starts from a clean tree.
+ */
+async function freshUser(displayName: string): Promise<string> {
+  const email = `tree-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@generations.test`;
+  const res = await fetch(`${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/projects/demo-generations/accounts`, {
+    method: 'POST',
+    headers: OWNER,
+    body: JSON.stringify({ email, password: PASSWORD, displayName, emailVerified: true }),
+  });
+  const { localId } = (await res.json()) as { localId: string };
+  await fetch(`${FIRESTORE_DOCS}/users/${localId}`, {
+    method: 'PATCH',
+    headers: OWNER,
+    body: JSON.stringify({
+      fields: {
+        email: { stringValue: email },
+        displayName: { stringValue: displayName },
+        role: { stringValue: 'user' },
+        active: { booleanValue: true },
+        createdAt: { timestampValue: new Date().toISOString() },
+      },
+    }),
+  });
+  return email;
+}
 
 /** The signed-in user's own card on the home canvas. */
 const ownCard = (page: Page, name: string) => page.locator('app-person-card ion-card-title', { hasText: name });
@@ -308,7 +339,7 @@ test('profile page: picture is cropped, shrunk and shown; name editable; email l
 });
 
 test('family tree: own card can be edited and the canvas panned and zoomed', async ({ page }) => {
-  await login(page, 'admin@generations.test');
+  await login(page, await freshUser('Admin'));
   const card = page.locator('app-person-card');
   await expect(ownCard(page, 'Admin')).toBeVisible();
 
@@ -345,7 +376,7 @@ test('family tree: own card can be edited and the canvas panned and zoomed', asy
 
 test('family tree: add relatives, remove a relationship and delete a person', async ({ page }) => {
   test.slow(); // many steps; slower CI runners need more than the default 30 s
-  await login(page, 'admin@generations.test');
+  await login(page, await freshUser('Ada Admin'));
   const card = (name: string) =>
     page.locator('app-person-card', { has: page.getByRole('heading', { name, exact: true }) });
   const modal = page.locator('ion-modal');
@@ -431,7 +462,7 @@ test('family tree: add relatives, remove a relationship and delete a person', as
 });
 
 test('family tree: up to 5 photos per person, browsed with arrows and removable', async ({ page }) => {
-  await login(page, 'admin@generations.test');
+  await login(page, await freshUser('Ada Admin'));
   const me = page.locator('app-person-card', { has: page.getByRole('heading', { name: 'Ada Admin', exact: true }) });
   const file = me.locator('input[type=file]');
   await expect(me.getByRole('button', { name: 'Add photo of Ada Admin' })).toBeVisible();
@@ -463,13 +494,16 @@ test('family tree: up to 5 photos per person, browsed with arrows and removable'
 
 test('family tree: loads the nearest 10 people first, then more while exploring', async ({ page }) => {
   test.slow(); // many steps; slower CI runners need more than the default 30 s
-  // Seed 20 generations of ancestors above the test user's own card.
-  const { localId: uid } = await lookup('user@generations.test');
-  const base = 'http://127.0.0.1:8080/v1/projects/demo-generations/databases/(default)/documents';
-  const headers = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
+  // Seed 20 generations of ancestors above a new user's own card.
+  const email = await freshUser('Test User');
+  const { localId: uid } = await lookup(email);
   const ids = (list: string[]) => ({ arrayValue: { values: list.map((stringValue) => ({ stringValue })) } });
   const put = (id: string, fields: Record<string, unknown>, mask = '') =>
-    fetch(`${base}/trees/${uid}/people/${id}${mask}`, { method: 'PATCH', headers, body: JSON.stringify({ fields }) });
+    fetch(`${FIRESTORE_DOCS}/trees/${uid}/people/${id}${mask}`, {
+      method: 'PATCH',
+      headers: OWNER,
+      body: JSON.stringify({ fields }),
+    });
   await put(
     uid,
     {
@@ -488,7 +522,7 @@ test('family tree: loads the nearest 10 people first, then more while exploring'
     });
   }
 
-  await login(page, 'user@generations.test');
+  await login(page, email);
   const cards = page.locator('app-person-card');
   await expect(page.getByRole('heading', { name: 'Ancestor 9', exact: true })).toBeAttached();
   // Own card + 9 ancestors; the 10th is a placeholder until it comes near the screen.
@@ -515,8 +549,9 @@ test('family tree: loads the nearest 10 people first, then more while exploring'
 
 test('family tree: "Remember last position" reopens where the user left, only when turned on', async ({ page }) => {
   test.slow(); // many steps; slower CI runners need more than the default 30 s
-  const { localId: uid } = await lookup('admin@generations.test');
-  const settingsDoc = `http://127.0.0.1:8080/v1/projects/demo-generations/databases/(default)/documents/trees/${uid}`;
+  const email = await freshUser('Ada Admin');
+  const { localId: uid } = await lookup(email);
+  const settingsDoc = `${FIRESTORE_DOCS}/trees/${uid}`;
   const savedZoom = async () => {
     const res = await fetch(settingsDoc, { headers: { Authorization: 'Bearer owner' } });
     const doc = (await res.json()) as { fields?: { view?: { mapValue: { fields: { z: { doubleValue?: number } } } } } };
@@ -536,12 +571,12 @@ test('family tree: "Remember last position" reopens where the user left, only wh
   const relogin = async () => {
     await page.getByRole('button', { name: 'Profile menu' }).last().click();
     await page.getByText('Logout').click();
-    await login(page, 'admin@generations.test');
+    await login(page, email);
     await expect(me).toBeVisible();
   };
 
   // Off by default: the canvas opens centered on the own card.
-  await login(page, 'admin@generations.test');
+  await login(page, email);
   await expect(me).toBeVisible();
   const centered = await box();
 

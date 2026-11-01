@@ -95,20 +95,22 @@ export class HomePage {
   private saveTimer?: ReturnType<typeof setTimeout>;
   /** Saved position waiting for its person to be laid out. */
   private restore: SavedView | null = null;
-  /** Set once the view was placed (centered or restored), so a late resize doesn't move it. */
-  private placed = false;
   private lastSaved = '';
   protected readonly cardWidth = CARD_W;
   protected readonly cardHeight = CARD_H;
 
   constructor() {
     addIcons({ add, locateOutline, remove });
-    // ion-content may still be zero-sized on first render; center once it has a size.
+    // Keep whatever is in the middle of the screen in the middle when the canvas
+    // resizes. This also centers the own card on start: ion-content may report
+    // zero width or height at first, and the view starts at (0, 0).
+    let size = { w: 0, h: 0 };
+    let observer: ResizeObserver | undefined;
     afterNextRender(() => {
-      const observer = new ResizeObserver(() => {
-        if (!this.canvas().nativeElement.clientWidth) return;
-        if (!this.placed) this.center();
-        observer.disconnect();
+      observer = new ResizeObserver(() => {
+        const { clientWidth: w, clientHeight: h } = this.canvas().nativeElement;
+        this.view.update((v) => ({ ...v, x: v.x + (w - size.w) / 2, y: v.y + (h - size.h) / 2 }));
+        size = { w, h };
       });
       observer.observe(this.canvas().nativeElement);
     });
@@ -146,6 +148,7 @@ export class HomePage {
     const flush = () => this.flushView();
     addEventListener('pagehide', flush);
     inject(DestroyRef).onDestroy(() => {
+      observer?.disconnect();
       clearTimeout(this.loadTimer);
       clearTimeout(this.saveTimer);
       removeEventListener('pagehide', flush);
@@ -195,7 +198,6 @@ export class HomePage {
   center(): void {
     const { clientWidth, clientHeight } = this.canvas().nativeElement;
     this.view.set({ x: clientWidth / 2, y: clientHeight / 2, z: 1 });
-    this.placed = true;
   }
 
   /** Center of a member's card (stacked, as drawn when not fanned out). */
@@ -217,7 +219,6 @@ export class HomePage {
     const { clientWidth: w, clientHeight: hh } = this.canvas().nativeElement;
     this.view.set({ x: w / 2 - (c.x + saved.dx) * saved.z, y: hh / 2 - (c.y + saved.dy) * saved.z, z: saved.z });
     this.restore = null;
-    this.placed = true;
   }
 
   /** Saves the person nearest the middle of the screen and the offset from them. */
