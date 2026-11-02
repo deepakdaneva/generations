@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0](https://github.com/deepakdaneva/generations/compare/v0.5.0...v1.0.0) (2026-11-02)
+
+
+### Features
+
+* General Availability (1.0.0) at generations.web.app ([#17](https://github.com/deepakdaneva/generations/issues/17)) ([d786501](https://github.com/deepakdaneva/generations/commit/d7865011eca7eeeba3bc938b1b2169ed09bd6d17))
+
 ## [0.5.0](https://github.com/deepakdaneva/generations/compare/v0.4.0...v0.5.0) (2026-11-01)
 
 
