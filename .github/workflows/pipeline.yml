@@ -1,6 +1,6 @@
 # CI for pull requests into development/main, plus deployment after a merge:
 #   development -> UAT (generations-uat)
-#   main        -> Production (generations-prod, waits for maintainer approval)
+#   main        -> Production (generations-prod, site generations.web.app; waits for maintainer approval)
 # Pushes to feature branches run nothing; test those locally (see README).
 # Google access is keyless (Workload Identity Federation), see docs/DEPLOYMENT.md.
 name: Pipeline
@@ -110,3 +110,5 @@ jobs:
       - run: npx firebase deploy --project "$PROJECT" --only hosting,firestore --non-interactive
         env:
           PROJECT: ${{ github.ref_name == 'main' && 'prod' || 'uat' }}
+          # Canonical address for link previews (the Hosting site, not the project id).
+          SITE_URL: ${{ github.ref_name == 'main' && 'https://generations.web.app' || 'https://generations-uat.web.app' }}

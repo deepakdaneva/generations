@@ -3,10 +3,12 @@
 **Every family has a story.** Generations helps families build, maintain and
 explore their family tree and family hierarchy.
 
-Try it (UAT test environment): <https://generations-uat.web.app> It runs as an installable Progressive Web App (PWA) on the
-web, iOS and Android, and is designed to grow into dedicated native apps later.
+**Use it:** <https://generations.web.app> (Production). It runs as an
+installable Progressive Web App (PWA) on the web, iOS and Android, and is
+designed to grow into dedicated native apps later. New features are tried
+first on the UAT test environment, <https://generations-uat.web.app>.
 
-> **Status:** early development (`v0.0.1`). Not production-ready.
+> **Status:** Generally available (GA) from `v1.0.0`.
 
 ## Screenshots
 
@@ -39,7 +41,7 @@ A made-up demo family, captured from the app running on the local emulators
 ## Objectives
 
 - A simple, welcoming way to record family members and how they are related.
-- An interactive family-tree canvas (being built step by step).
+- An interactive family-tree canvas.
 - Runs entirely on Firebase, within the free **Spark** plan, with no separate
   backend server.
 - Open source, easy to self-host, and cheap to maintain.
@@ -60,7 +62,7 @@ A made-up demo family, captured from the app running on the local emulators
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and the
 reasoning behind these choices.
 
-## Features (v0.0.1)
+## Features
 
 - Email + password sign-in, self-registration, and mandatory email verification
   (unverified accounts cannot sign in or read any data). New accounts wait for
@@ -99,7 +101,7 @@ reasoning behind these choices.
 - **About** (profile button → About, or the version link on the sign-in page):
   version, commit, deployment time, environment, source code, issues, security
   policy, license and copyright. Public, no sign-in needed.
-- **Family tree (in progress):** the home page is a canvas centered on your
+- **Family tree:** the home page is a canvas centered on your
   own card. Drag (mouse or finger) or use the arrow keys to move; scroll, pinch
   or use the +/- buttons to zoom; the target button re-centers.
   - Hover or tap a card for its buttons: **+** on top adds a parent, left and
