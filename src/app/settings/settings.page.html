@@ -1,0 +1,41 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Settings</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-list>
+    <ion-list-header><ion-label>Theme</ion-label></ion-list-header>
+    <ion-radio-group [value]="theme.mode()" (ionChange)="theme.setMode($event.detail.value)">
+      @for (option of themes; track option.value) {
+      <ion-item>
+        <ion-radio [value]="option.value">{{ option.label }}</ion-radio>
+      </ion-item>
+      }
+    </ion-radio-group>
+    <ion-item lines="none">
+      <ion-note>Saved on this device.</ion-note>
+    </ion-item>
+
+    <ion-list-header><ion-label>Family tree</ion-label></ion-list-header>
+    <ion-item>
+      <ion-toggle
+        [checked]="tree.rememberView()"
+        [disabled]="!ready()"
+        (ionChange)="setRememberView($event.detail.checked)"
+      >
+        <ion-label>
+          Remember last position
+          <p>
+            Opens the family tree where you left it, also after signing in again or on another device. When off, it
+            always opens on your own card.
+          </p>
+        </ion-label>
+      </ion-toggle>
+    </ion-item>
+  </ion-list>
+</ion-content>

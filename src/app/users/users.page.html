@@ -1,0 +1,100 @@
+<ion-content>
+  <app-top-actions class="solid">
+    <ion-searchbar
+      placeholder="Search name, email, role or status"
+      [debounce]="150"
+      [value]="search()"
+      (ionInput)="search.set($event.detail.value ?? '')"
+      aria-label="Search users"
+    ></ion-searchbar>
+  </app-top-actions>
+  <div class="top-spacer"></div>
+
+  @if (filtered(); as list) { @if (list.length === 0) {
+  <p class="ion-padding ion-text-center"><ion-text color="medium">No users match "{{ search() }}".</ion-text></p>
+  }
+  <ion-list>
+    @for (user of list; track user.id) { @let isMe = user.id === auth.profile()?.id;
+    <ion-item [button]="!isMe" [detail]="!isMe" (click)="isMe || manage(user)">
+      @if (user.photo) {
+      <ion-avatar slot="start"><img [src]="user.photo" alt="" /></ion-avatar>
+      } @else {
+      <ion-icon slot="start" name="person-circle-outline" size="large" aria-hidden="true"></ion-icon>
+      }
+      <ion-label>
+        <h2>{{ user.displayName }} @if (isMe) {<ion-text color="medium">(you)</ion-text>}</h2>
+        <p>{{ user.email }}</p>
+      </ion-label>
+      @if (!user.active) {
+      <ion-badge slot="end" color="danger">Inactive</ion-badge>
+      }
+      <ion-badge slot="end" [color]="user.role === 'admin' ? 'primary' : 'medium'">
+        {{ user.role === 'admin' ? 'Admin' : 'User' }}
+      </ion-badge>
+    </ion-item>
+    }
+  </ion-list>
+  } @else {
+  <div class="ion-text-center ion-padding"><ion-spinner></ion-spinner></div>
+  }
+
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+    <ion-fab-button (click)="createOpen.set(true)" aria-label="Add user">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+  <ion-modal [isOpen]="createOpen()" (didDismiss)="createOpen.set(false)">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-buttons slot="start">
+            <ion-button (click)="createOpen.set(false)">Cancel</ion-button>
+          </ion-buttons>
+          <ion-title>Add user</ion-title>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <form [formGroup]="form" (ngSubmit)="create()">
+          <ion-input
+            formControlName="displayName"
+            label="Full name"
+            labelPlacement="floating"
+            fill="outline"
+            errorText="Enter a name"
+          ></ion-input>
+          <ion-input
+            class="ion-margin-top"
+            formControlName="email"
+            type="email"
+            label="Email"
+            labelPlacement="floating"
+            fill="outline"
+            errorText="Enter a valid email address"
+            helperText="They will get an email to set their own password."
+          ></ion-input>
+          <ion-select
+            class="ion-margin-top"
+            formControlName="role"
+            label="Role"
+            labelPlacement="floating"
+            fill="outline"
+          >
+            <ion-select-option value="user">User</ion-select-option>
+            <ion-select-option value="admin">Admin</ion-select-option>
+          </ion-select>
+
+          @if (createError()) {
+          <ion-text color="danger"><p>{{ createError() }}</p></ion-text>
+          }
+
+          <ion-button class="ion-margin-top" type="submit" expand="block" [disabled]="busy()">
+            @if (busy()) {
+            <ion-spinner name="crescent"></ion-spinner>
+            } @else { Create user }
+          </ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</ion-content>

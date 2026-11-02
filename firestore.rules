@@ -1,0 +1,209 @@
+rules_version = '2';
+
+// Authorization for Generations. The UI hides things for convenience; these
+// rules are what actually protect the data. See docs/ARCHITECTURE.md.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActive() {
+      return verified()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && profile().active == true;
+    }
+
+    function isAdmin() {
+      return isActive() && profile().role == 'admin';
+    }
+
+    function validName(name) {
+      return name is string && name.size() > 0 && name.size() <= 100;
+    }
+
+    // Profile picture: a small square image embedded as a data URL (Cloud
+    // Storage needs the paid plan). The app sends 256x256 images of ~15-30 KB;
+    // the cap keeps anyone from filling the database with big files.
+    function validPhoto(data) {
+      return !('photo' in data)
+        || (data.photo is string
+          && data.photo.size() <= 70000
+          && data.photo.matches('data:image/(jpeg|webp);base64,[A-Za-z0-9+/=]+'));
+    }
+
+    function validUser(data) {
+      return data.keys().hasOnly(['email', 'displayName', 'role', 'active', 'createdAt'])
+        && data.email is string
+        && validName(data.displayName)
+        && data.role in ['admin', 'user']
+        && data.active is bool
+        && data.createdAt == request.time;
+    }
+
+    match /users/{userId} {
+      // Users can always read their own profile (even when deactivated, so the
+      // app can tell them); admins can read everyone.
+      allow get: if (verified() && request.auth.uid == userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Self-registration: a verified user creates their own profile, always as
+      // a normal user waiting for approval (inactive) until an admin activates
+      // it. Admins can create profiles for others (active or not).
+      allow create: if validUser(request.resource.data) && (
+        (verified()
+          && request.auth.uid == userId
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.role == 'user'
+          && request.resource.data.active == false)
+        || (isAdmin() && request.auth.uid != userId)
+      );
+
+      // Active users edit their own name and picture (never email, role or
+      // status). Admins change other users' name, role and status, never their
+      // own role or status.
+      allow update: if (
+          isActive()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photo'])
+          && validName(request.resource.data.displayName)
+          && validPhoto(request.resource.data)
+        ) || (
+          isAdmin()
+          && request.auth.uid != userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'role', 'active'])
+          && validName(request.resource.data.displayName)
+          && request.resource.data.role in ['admin', 'user']
+          && request.resource.data.active is bool
+        );
+
+      // No deletes: without the Admin SDK the Auth account would remain, and the
+      // user could recreate their profile. Deactivate instead.
+      allow delete: if false;
+    }
+
+    // Family tree: each user owns one tree, trees/{uid}/people/{personId}; their
+    // own card has personId == uid. Only the owner (active) can use it.
+    // ponytail: plaintext for now; browser-side encryption replaces these
+    // fields with one encrypted blob in a later step.
+    function optText(data, key, max) {
+      return !(key in data) || (data[key] is string && data[key].size() <= max);
+    }
+
+    function optDate(data, key) {
+      return !(key in data) || (data[key] is string && data[key].matches('[0-9]{4}-[0-9]{2}-[0-9]{2}'));
+    }
+
+    function optIds(data, key, max) {
+      return !(key in data) || (data[key] is list && data[key].size() <= max);
+    }
+
+    function validPerson(data) {
+      return data.keys().hasOnly(['name', 'gender', 'birth', 'death', 'anniversary', 'email', 'address',
+          'socials', 'parents', 'children', 'spouses', 'siblings', 'photos', 'updatedAt'])
+        && validName(data.name)
+        && (!('gender' in data) || data.gender in ['male', 'female', 'other'])
+        && optDate(data, 'birth') && optDate(data, 'death') && optDate(data, 'anniversary')
+        && optText(data, 'email', 254) && optText(data, 'address', 500)
+        && (!('socials' in data) || (data.socials is list && data.socials.size() <= 10))
+        && optIds(data, 'parents', 2) && optIds(data, 'children', 50)
+        && optIds(data, 'spouses', 10) && optIds(data, 'siblings', 50)
+        && optIds(data, 'photos', 5)
+        && data.updatedAt == request.time;
+    }
+
+    // Notifications for admins. Today the only kind: a new self-registered
+    // account asks to be approved. The new user's browser creates it (there is
+    // no backend on the Spark plan), only for themselves (id = their uid, so at
+    // most one), only as pending and only while their profile is inactive.
+    // Admins read them, mark them read (readBy), and approve or reject once;
+    // approving must activate the user in the same batch.
+    match /notifications/{id} {
+      allow read: if isAdmin() && resource.data.audience == 'admins';
+      allow create: if verified()
+        && id == request.auth.uid
+        && request.resource.data.keys().hasOnly(
+          ['type', 'audience', 'userId', 'email', 'displayName', 'status', 'readBy', 'createdAt'])
+        && request.resource.data.type == 'account-approval'
+        && request.resource.data.audience == 'admins'
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && validName(request.resource.data.displayName)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.readBy == []
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == false;
+      allow update: if isAdmin() && resource.data.audience == 'admins' && (
+          // Opened: add yourself to readBy, nothing else.
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+            && request.resource.data.readBy.toSet()
+              == resource.data.readBy.toSet().union([request.auth.uid].toSet()))
+          // Acted on: once, by you, now; approving activates the user too.
+          || (resource.data.status == 'pending'
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'actedBy', 'actedAt', 'readBy'])
+            && request.resource.data.status in ['approved', 'rejected']
+            && request.resource.data.actedBy == request.auth.uid
+            && request.resource.data.actedAt == request.time
+            && request.resource.data.readBy is list && request.resource.data.readBy.size() <= 100
+            && (request.resource.data.status == 'rejected'
+              || getAfter(/databases/$(database)/documents/users/$(resource.data.userId)).data.active == true))
+        );
+      allow delete: if false;
+    }
+
+    // Tree settings: "remember last position" and the saved position (the person
+    // near the middle of the screen, the chain of ids to load them from the
+    // user's own card, the offset from their card and the zoom).
+    function validView(v) {
+      return v is map
+        && v.keys().hasOnly(['focus', 'path', 'dx', 'dy', 'z'])
+        && v.focus is string
+        && v.path is list && v.path.size() <= 100
+        && v.dx is number && v.dy is number
+        && v.z is number && v.z > 0 && v.z <= 4;
+    }
+
+    match /trees/{ownerId} {
+      allow read, delete: if isActive() && request.auth.uid == ownerId;
+      allow create, update: if isActive() && request.auth.uid == ownerId
+        && request.resource.data.keys().hasOnly(['rememberView', 'view', 'updatedAt'])
+        && request.resource.data.rememberView is bool
+        && (!('view' in request.resource.data) || validView(request.resource.data.view))
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    match /trees/{ownerId}/people/{personId} {
+      allow read, delete: if isActive() && request.auth.uid == ownerId;
+      allow create, update: if isActive() && request.auth.uid == ownerId && validPerson(request.resource.data);
+    }
+
+    // Up to 5 photos per person: the id is "{personId}_{0-4}", so there are only
+    // five possible documents. Each is a small WebP/JPEG data URL (the app
+    // sends 480 px images of ~20-40 KB; Cloud Storage needs the paid plan).
+    function validTreePhoto(data) {
+      return data.keys().hasOnly(['data', 'updatedAt'])
+        && data.data is string
+        && data.data.size() <= 100000
+        && data.data.matches('data:image/(jpeg|webp);base64,[A-Za-z0-9+/=]+')
+        && data.updatedAt == request.time;
+    }
+
+    match /trees/{ownerId}/photos/{photoId} {
+      allow read, delete: if isActive() && request.auth.uid == ownerId;
+      allow create, update: if isActive() && request.auth.uid == ownerId
+        && photoId.matches('[A-Za-z0-9]+_[0-4]')
+        && validTreePhoto(request.resource.data);
+    }
+
+    // Everything else is denied until a feature defines its own rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

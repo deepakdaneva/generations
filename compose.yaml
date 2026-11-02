@@ -1,0 +1,21 @@
+# Local development: `docker compose up --build`, then open http://localhost:4200
+# (app) and http://localhost:4000 (Emulator UI).
+services:
+  app:
+    build: .
+    ports:
+      - '127.0.0.1:4200:4200' # app
+      - '127.0.0.1:4000:4000' # Emulator UI
+      - '127.0.0.1:9099:9099' # Auth emulator
+      - '127.0.0.1:8080:8080' # Firestore emulator
+      - '127.0.0.1:9150:9150' # Firestore emulator UI websocket
+      - '127.0.0.1:4400:4400' # Emulator hub
+      - '127.0.0.1:4500:4500' # Emulator logging
+    volumes:
+      - emulator-data:/data
+    init: true
+    stop_signal: SIGINT # the emulators export data only on a clean SIGINT
+    stop_grace_period: 30s
+
+volumes:
+  emulator-data:

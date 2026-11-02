@@ -1,0 +1,29 @@
+.about {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.intro {
+  padding: 24px 16px 8px;
+  text-align: center;
+
+  h1 {
+    margin: 8px 0 4px;
+  }
+
+  p {
+    margin: 0;
+    color: var(--ion-color-medium);
+  }
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+}
+
+.footer {
+  padding: 8px 16px 24px;
+  font-size: 0.8em;
+  text-align: center;
+  color: var(--ion-color-medium);
+}

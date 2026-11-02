@@ -1,0 +1,24 @@
+# Keep the Docker build context small and free of secrets.
+.git
+.github
+.vscode
+.idea
+.angular
+node_modules
+www
+dist
+coverage
+test-results
+playwright-report
+blob-report
+emulator-data
+.firebase
+*.log
+
+# Secrets
+.env
+.env.*
+!.env.example
+*service-account*.json
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
