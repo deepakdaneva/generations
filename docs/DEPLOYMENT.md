@@ -164,12 +164,13 @@ in the consoles (the deploy service account cannot and should not):
 
 ### Releasing
 
-1. Merge the open Release Please pull request on `development` (`1.0.0` for
-   GA). This tags `vX.Y.Z`, publishes a GitHub Release and deploys to UAT.
+1. Merge the open Release Please pull request on `development`. This tags `vX.Y.Z`, publishes a GitHub Release and deploys to UAT.
 2. Check UAT.
 3. Open a pull request from `development` into `main`, titled
    `release: vX.Y.Z`. CI runs on it.
-4. Merge it, then approve the **Deploy** job in GitHub Actions. It deploys
+4. Merge it with **Create a merge commit** (not squash), so `main` and
+   `development` keep one shared history and later release pull requests stay
+   conflict-free. Then approve the **Deploy** job in GitHub Actions. It deploys
    Hosting, Firestore rules and indexes to Production.
 5. Check <https://generations.web.app>: the sign-in page shows the version.
 
