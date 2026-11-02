@@ -4,6 +4,7 @@
   "packages": {
     ".": {
       "release-type": "node",
+      "release-as": "1.0.0",
       "package-name": "generations",
       "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md"
