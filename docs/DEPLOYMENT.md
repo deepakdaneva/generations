@@ -9,7 +9,7 @@ separate Firebase project.
 |---|---|---|---|---|
 | Local | `demo-generations` (emulators only) | `default` | <http://localhost:4200> | `npm run dev` |
 | UAT | `generations-uat` | `uat` | <https://generations-uat.web.app> | Deployed |
-| Production (GA) | `generations-prod` | `prod` | <https://generations.web.app> | Generally available from `v1.0.0` |
+| Production (GA) | `generations-prod` | `prod` | <https://generations-prod.web.app> | Generally available from `v1.0.0` |
 
 Both real projects have:
 
@@ -19,11 +19,9 @@ Both real projects have:
 - Authentication with the Email/Password and Google providers enabled.
 - A registered web app named "Generations Web". The deployed app reads its
   config from `/__/firebase/init.json`, so no config is stored in the code.
-- A Hosting site for the app, mapped to the `app` deploy target in
-  `.firebaserc` (`firebase.json` deploys to that target). UAT uses its default
-  site `generations-uat`; Production uses the extra site `generations`, so the
-  app lives at `generations.web.app` instead of `generations-prod.web.app`.
-  The pipeline sets `SITE_URL` to match, for link previews.
+- The app on the project's default Hosting site (`<project>.web.app`). The
+  site id `generations` was taken, so Production stays on
+  `generations-prod.web.app`.
 
 ## Prerequisites
 
@@ -137,7 +135,7 @@ Always run `npm run test:rules` before deploying rule changes.
 
 ## Production (General Availability)
 
-Production is generally available (GA) at <https://generations.web.app>,
+Production is generally available (GA) at <https://generations-prod.web.app>,
 starting with `v1.0.0`. It is deployed only by the pipeline, from `main`,
 after the maintainer approves the run in GitHub Actions.
 
@@ -146,32 +144,28 @@ after the maintainer approves the run in GitHub Actions.
 These steps change the live Production project, so the maintainer does them
 in the consoles (the deploy service account cannot and should not):
 
-1. **Hosting site:** Firebase console → `generations-prod` → **Hosting → Add
-   another site** → site id `generations` (or
-   `npx firebase hosting:sites:create generations --project prod`). Site ids
-   are global: if `generations` is taken, pick another and update
-   `.firebaserc` (`targets`), the pipeline's `SITE_URL` and this page.
-2. **Authorized domains:** Authentication → Settings → Authorized domains →
-   add `generations.web.app`. Keep `generations-prod.firebaseapp.com` (Google
-   sign-in runs there).
-3. **API key:** add `https://generations.web.app/*` to the browser key's
-   allowed websites (see "API key restriction" below).
-4. **App Check:** add `generations.web.app` to the Production reCAPTCHA key's
-   domains (Google Cloud console → Security → reCAPTCHA).
-5. **GitHub:** the `production` environment requires the maintainer's
+1. **Authorized domains:** Authentication → Settings → Authorized domains
+   keeps `generations-prod.web.app` and `generations-prod.firebaseapp.com`
+   (Google sign-in runs there).
+2. **API key:** the browser key's allowed websites include
+   `https://generations-prod.web.app/*` (see "API key restriction" below).
+3. **App Check:** the Production reCAPTCHA key's domains include
+   `generations-prod.web.app`.
+4. **GitHub:** the `production` environment requires the maintainer's
    approval and only accepts `main` (Settings → Environments), with
    `WIF_PROVIDER` and `DEPLOY_SERVICE_ACCOUNT` set (see above).
 
 ### Releasing
 
-1. Merge the open Release Please pull request on `development` (`1.0.0` for
-   GA). This tags `vX.Y.Z`, publishes a GitHub Release and deploys to UAT.
+1. Merge the open Release Please pull request on `development`. This tags `vX.Y.Z`, publishes a GitHub Release and deploys to UAT.
 2. Check UAT.
 3. Open a pull request from `development` into `main`, titled
    `release: vX.Y.Z`. CI runs on it.
-4. Merge it, then approve the **Deploy** job in GitHub Actions. It deploys
+4. Merge it with **Create a merge commit** (not squash), so `main` and
+   `development` keep one shared history and later release pull requests stay
+   conflict-free. Then approve the **Deploy** job in GitHub Actions. It deploys
    Hosting, Firestore rules and indexes to Production.
-5. Check <https://generations.web.app>: the sign-in page shows the version.
+5. Check <https://generations-prod.web.app>: the sign-in page shows the version.
 
 ### After the first release
 
@@ -204,7 +198,7 @@ created by Firebase)" → **Application restrictions: Websites**:
 | Project | Allowed websites |
 |---|---|
 | `generations-uat` | `https://generations-uat.web.app/*`, `https://generations-uat.firebaseapp.com/*` |
-| `generations-prod` | `https://generations.web.app/*`, `https://generations-prod.firebaseapp.com/*` |
+| `generations-prod` | `https://generations-prod.web.app/*`, `https://generations-prod.firebaseapp.com/*` |
 
 - Keep the `firebaseapp.com` entry: Google sign-in runs on that domain.
 - Do not add `localhost`; local development uses the emulators, not these keys.
@@ -233,8 +227,7 @@ browser. Site keys live in `src/environments/app-check.ts` (public values).
 Setting up a project:
 
 1. Google Cloud console → **Security → reCAPTCHA** → **Create key**: Web,
-   domains: the app's site (`generations-uat.web.app`, `generations.web.app`)
-   and `<project>.firebaseapp.com`, **checkbox
+   domains `<project>.web.app` and `<project>.firebaseapp.com`, **checkbox
    challenge off** (score-based; a checkbox key fails with
    `appCheck/recaptcha-error`), no `localhost`.
 2. Firebase console → **App Check → Apps** → the web app → reCAPTCHA

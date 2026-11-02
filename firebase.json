@@ -6,7 +6,6 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "target": "app",
     "public": "www",
     "predeploy": ["node scripts/prepare-hosting.mjs"],
     "ignore": ["firebase.json", "**/.*"],
