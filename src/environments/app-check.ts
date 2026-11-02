@@ -6,5 +6,5 @@
  */
 export const appCheckSiteKeys: Record<string, string> = {
   'generations-uat': '6Lc_AQouAAAAAGQJsIwdH5DXeOdMpukAwTSXoBvi',
-  'generations-prod': '6Lf2ugkuAAAAAKUOm622Ifd_pLc13ApLOuDmJlKT',
+  'generations-prod': '6LdscQwuAAAAAAW4CyxDndGcWW-6P8n53hskewYj',
 };

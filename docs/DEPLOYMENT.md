@@ -228,7 +228,7 @@ browser. Site keys live in `src/environments/app-check.ts` (public values).
 | Project | Site key | Firestore enforcement |
 |---|---|---|
 | `generations-uat` | `6Lc_AQouAAAAAGQJsIwdH5DXeOdMpukAwTSXoBvi` | **Enforced** |
-| `generations-prod` | `6Lf2ugkuAAAAAKUOm622Ifd_pLc13ApLOuDmJlKT` | Not yet (enforce after the first Production release) |
+| `generations-prod` | `6LdscQwuAAAAAAW4CyxDndGcWW-6P8n53hskewYj` | Not yet (enforce after the first Production release) |
 
 Setting up a project:
 
