@@ -3,7 +3,7 @@
 **Every family has a story.** Generations helps families build, maintain and
 explore their family tree and family hierarchy.
 
-**Use it:** <https://generations.web.app> (Production). It runs as an
+**Use it:** <https://generations-prod.web.app> (Production). It runs as an
 installable Progressive Web App (PWA) on the web, iOS and Android, and is
 designed to grow into dedicated native apps later. New features are tried
 first on the UAT test environment, <https://generations-uat.web.app>.
