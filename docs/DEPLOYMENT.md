@@ -187,6 +187,20 @@ up once in the Firebase console:
 
 Further admins are promoted from the User Management page.
 
+## Sign-up approval (per environment)
+
+By default, a self-registered account waits until an admin approves it. To let
+new users in directly (Production), create this document once in the Firebase
+console, under **Firestore Database**:
+
+- Collection `config`, document ID `signup`
+- Field `approvalRequired`, type boolean, value `false`
+
+UAT has no such document, so approval stays required there. Set the field to
+`true`, or delete the document, to require approval again; no deploy needed.
+Accounts already waiting for approval stay inactive until an admin activates
+them.
+
 ## API key restriction (done once per project)
 
 The browser API key is public by design, but it is restricted so that only the

@@ -19,6 +19,7 @@ import {
 import {
   deleteField,
   doc,
+  getDoc,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -229,24 +230,37 @@ export class AuthService {
     const ref = doc(this.db, 'users', user.uid);
     // Profile unreadable or not creatable (e.g. rules changed): fail closed.
     const failClosed = () => signOut(this.auth);
+    let creating = false;
     this.stopProfile = onSnapshot(
       ref,
       { includeMetadataChanges: true },
       async (snap) => {
         if (!snap.exists()) {
+          // The config read below is async; ignore snapshots that arrive meanwhile.
+          if (creating) return;
+          creating = true;
           // First verified sign-in of a self-registered user (email or Google):
-          // create the profile, inactive until an admin approves it, and in the
-          // same write ask the admins for approval (see firestore.rules).
+          // create the profile. Unless config/signup turns approval off, it
+          // stays inactive until an admin approves it, and the same write asks
+          // the admins for approval (see firestore.rules).
           const displayName = user.displayName || user.email?.split('@')[0] || 'User';
+          const approval = await getDoc(doc(this.db, 'config', 'signup'))
+            .then((s) => s.get('approvalRequired') !== false)
+            .catch(() => true);
           const batch = writeBatch(this.db);
           batch.set(ref, {
             email: user.email,
             displayName,
             role: 'user',
-            active: false, // waits for an admin to approve (rules enforce this)
+            active: !approval, // rules allow active only when approval is off
             createdAt: serverTimestamp(),
           });
-          batch.set(doc(this.db, 'notifications', user.uid), approvalRequest(user.uid, user.email ?? '', displayName));
+          if (approval) {
+            batch.set(
+              doc(this.db, 'notifications', user.uid),
+              approvalRequest(user.uid, user.email ?? '', displayName),
+            );
+          }
           await batch.commit().catch(failClosed);
           return; // the snapshot fires again with the new profile
         }
