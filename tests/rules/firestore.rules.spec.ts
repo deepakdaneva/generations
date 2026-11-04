@@ -87,6 +87,26 @@ describe('self-registration', () => {
     assertFails(setDoc(doc(db('bob'), 'users/carol'), profile('carol@example.test', 'user', false))));
   it('blocks a deactivated user from recreating their profile', () =>
     assertFails(setDoc(doc(db('off'), 'users/off'), profile('off@example.test', 'user', false))));
+
+  const signup = (data: object) =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'config/signup'), data));
+
+  it('lets a verified user self-register as active when config/signup turns approval off', async () => {
+    await signup({ approvalRequired: false });
+    await assertSucceeds(setDoc(doc(db('bob'), 'users/bob'), profile('bob@example.test', 'user')));
+    // Still never as admin.
+    await assertFails(setDoc(doc(db('carol'), 'users/carol'), profile('carol@example.test', 'admin')));
+  });
+  it('still requires approval when config/signup sets approvalRequired true', async () => {
+    await signup({ approvalRequired: true });
+    await assertFails(setDoc(doc(db('bob'), 'users/bob'), profile('bob@example.test', 'user')));
+  });
+  it('lets verified users read config/signup, and nobody write it', async () => {
+    await signup({ approvalRequired: false });
+    await assertSucceeds(getDoc(doc(db('bob'), 'config/signup')));
+    await assertFails(getDoc(doc(db('bob', false), 'config/signup')));
+    await assertFails(setDoc(doc(db('admin'), 'config/signup'), { approvalRequired: true }));
+  });
 });
 
 describe('admin management', () => {

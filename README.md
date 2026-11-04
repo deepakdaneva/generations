@@ -66,7 +66,9 @@ reasoning behind these choices.
 
 - Email + password sign-in, self-registration, and mandatory email verification
   (unverified accounts cannot sign in or read any data). New accounts wait for
-  an admin's approval before they can use the app.
+  an admin's approval before they can use the app, unless the project's
+  `config/signup` document sets `approvalRequired: false` (see
+  [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 - "Continue with Google" sign-in (Google accounts are already verified; first
   use creates a normal user that also waits for approval).
 - Password reset by email ("Forgot password?" on the sign-in page).

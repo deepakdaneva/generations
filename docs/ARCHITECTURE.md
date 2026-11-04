@@ -360,8 +360,12 @@ ciphertext.
 - Users can read their own profile, even when deactivated, so the app can tell
   them. Only active admins can read or list everyone.
 - A verified user may create **their own** profile only as `role: "user"`,
-  `active: false` (waiting for approval), with their own email. Active admins may create profiles for
+  `active: false` (waiting for approval), with their own email. It may be `active: true` only when
+  `config/signup` has `approvalRequired: false`. Active admins may create profiles for
   others with any role.
+- `config/signup` (`approvalRequired: bool`) is set by hand in the Firebase
+  console, per project. Verified users can read it; nobody writes it from the
+  app. Without the document, approval is required.
 - Active users can update their own `displayName` and `photo` only (never
   email, role or status). `photo` must be a JPEG/WebP data URL of at most
   70,000 characters.
@@ -393,7 +397,10 @@ emulator (`npm run test:rules`).
    verification email, sign out.
 2. **Sign in:** if the email is not verified, sign out again and offer to
    resend the verification email.
-3. **First verified sign-in:** the app creates the user's profile
+3. **First verified sign-in:** the app reads `config/signup`. If
+   `approvalRequired` is `false` (Production), it creates an active profile
+   and the user is in at once; no notification. Otherwise (UAT, or no
+   document) it creates the user's profile
    (`role: "user"`, `active: false`), and in the same batch write a
    notification asking the admins for approval (there is no backend to do it;
    the rules allow exactly this). The rules enforce those values. Accounts

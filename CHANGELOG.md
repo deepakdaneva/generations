@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/deepakdaneva/generations/compare/v1.0.0...v1.1.0) (2026-11-04)
+
+
+### Features
+
+* make sign-up approval a per-project setting (config/signup) ([#24](https://github.com/deepakdaneva/generations/issues/24)) ([48c713c](https://github.com/deepakdaneva/generations/commit/48c713c1979cb0240995a0972e18f77a8584d499))
+
+
+### Bug Fixes
+
+* allow www.gstatic.com in CSP connect-src for service worker ([#22](https://github.com/deepakdaneva/generations/issues/22)) ([883e05c](https://github.com/deepakdaneva/generations/commit/883e05c731c3c3692395034fa06b0671f11acaf9))
+
 ## [1.0.0](https://github.com/deepakdaneva/generations/compare/v0.5.0...v1.0.0) (2026-11-02)
 
 
