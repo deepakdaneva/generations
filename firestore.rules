@@ -46,6 +46,19 @@ service cloud.firestore {
         && data.createdAt == request.time;
     }
 
+    // Per-project sign-up setting, set by hand in the Firebase console (no
+    // app writes it). Without the document, or unless approvalRequired is
+    // false, new accounts wait for an admin's approval.
+    function approvalRequired() {
+      let cfg = /databases/$(database)/documents/config/signup;
+      return !exists(cfg) || get(cfg).data.get('approvalRequired', true) != false;
+    }
+
+    match /config/signup {
+      allow get: if verified();
+      allow list, write: if false;
+    }
+
     match /users/{userId} {
       // Users can always read their own profile (even when deactivated, so the
       // app can tell them); admins can read everyone.
@@ -53,14 +66,15 @@ service cloud.firestore {
       allow list: if isAdmin();
 
       // Self-registration: a verified user creates their own profile, always as
-      // a normal user waiting for approval (inactive) until an admin activates
-      // it. Admins can create profiles for others (active or not).
+      // a normal user, waiting for approval (inactive) until an admin activates
+      // it, or active right away when config/signup turns approval off.
+      // Admins can create profiles for others (active or not).
       allow create: if validUser(request.resource.data) && (
         (verified()
           && request.auth.uid == userId
           && request.resource.data.email == request.auth.token.email
           && request.resource.data.role == 'user'
-          && request.resource.data.active == false)
+          && (request.resource.data.active == false || !approvalRequired()))
         || (isAdmin() && request.auth.uid != userId)
       );
 
