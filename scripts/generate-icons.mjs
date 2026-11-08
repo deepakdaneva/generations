@@ -31,6 +31,12 @@ const icons = [
   { file: 'public/icons/maskable-512.png', svg: svg(0, 0.5), size: 512 },
   { file: 'public/icons/apple-touch-icon.png', svg: svg(0, 0.56), size: 180 },
   { file: 'src/assets/icon/favicon.png', svg: svg(112, 0.66), size: 64 },
+  // Android launcher icons for Android 7 (API 24-25). Newer versions use the
+  // adaptive vector icon in android/app/src/main/res/mipmap-anydpi-v26.
+  ...Object.entries({ mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 }).flatMap(([density, size]) => [
+    { file: `android/app/src/main/res/mipmap-${density}/ic_launcher.png`, svg: svg(112, 0.62), size },
+    { file: `android/app/src/main/res/mipmap-${density}/ic_launcher_round.png`, svg: svg(256, 0.56), size },
+  ]),
 ];
 
 const browser = await chromium.launch();

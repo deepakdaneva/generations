@@ -9,7 +9,8 @@ any specific regulation.
 Generations is open-source software. This policy covers the instances
 operated by the project maintainer: <https://generations-prod.web.app>
 (Production) and <https://generations-uat.web.app> (UAT, for testing new
-features). Anyone who deploys their own copy is responsible for their own
+features), and the Android app connected to them, which stores the same data
+in the same places. Anyone who deploys their own copy is responsible for their own
 instance and policy.
 
 ## What we store

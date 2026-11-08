@@ -1,0 +1,55 @@
+<ion-content [fullscreen]="true">
+  <div class="story" [class.paused]="paused()">
+    <div class="bars" aria-hidden="true">
+      @for (s of slides; track $index) {
+      <span class="bar">
+        <span
+          class="fill"
+          [class.done]="$index < index()"
+          [class.active]="$index === index()"
+          [style.animation-duration.ms]="slideMs"
+          (animationend)="next()"
+        ></span>
+      </span>
+      }
+    </div>
+    @if (!last()) {
+    <button type="button" class="skip" (click)="index.set(slides.length - 1)">Skip</button>
+    }
+
+    <!-- Tap left/right to go back/forward; press and hold to pause. -->
+    <button
+      type="button"
+      class="zone prev"
+      aria-label="Previous"
+      (click)="prev()"
+      (pointerdown)="paused.set(true)"
+      (pointerup)="paused.set(false)"
+      (pointerleave)="paused.set(false)"
+    ></button>
+    <button
+      type="button"
+      class="zone next"
+      aria-label="Next"
+      (click)="next()"
+      (pointerdown)="paused.set(true)"
+      (pointerup)="paused.set(false)"
+      (pointerleave)="paused.set(false)"
+    ></button>
+
+    @for (s of slides; track $index) { @if ($index === index()) {
+    <section class="slide" [attr.aria-label]="'Slide ' + ($index + 1) + ' of ' + slides.length" aria-live="polite">
+      <div class="art"><ion-icon [name]="s.icon" aria-hidden="true"></ion-icon></div>
+      <h1>{{ s.title }}</h1>
+      <p>{{ s.text }}</p>
+    </section>
+    } }
+
+    <div class="cta" [class.hidden]="!last()">
+      <ion-button expand="block" class="start" (click)="finish('/register')">Create account</ion-button>
+      <ion-button expand="block" fill="clear" class="signin" (click)="finish('/login')">
+        I already have an account
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

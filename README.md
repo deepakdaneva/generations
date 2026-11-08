@@ -51,7 +51,7 @@ A made-up demo family, captured from the app running on the local emulators
 | Concern | Choice |
 |---|---|
 | UI framework | [Ionic Framework 9](https://ionicframework.com/) with [Angular 22](https://angular.dev/) (standalone components) |
-| Native apps (later) | [Capacitor 8](https://capacitorjs.com/) (iOS / Android from the same code) |
+| Native apps | [Capacitor 8](https://capacitorjs.com/): Android now, iOS later, from the same code ([docs/ANDROID.md](docs/ANDROID.md)) |
 | Authentication | Firebase Authentication (email + password with verification, Google) |
 | Database | Cloud Firestore, protected by Firestore Security Rules |
 | Hosting | Firebase Hosting |
@@ -160,6 +160,10 @@ reasoning behind these choices.
   desktop; it opens full screen, starts offline, and offers a reload when a new
   version is deployed.
 
+- **Android app** (in development): the same app with an adaptive icon, an
+  animated launch screen and welcome slides on first launch; see
+  [docs/ANDROID.md](docs/ANDROID.md). Pull requests build a test APK.
+
 ### Install on a phone
 
 - **Android (Chrome/Edge):** open the site, then menu → **Install app** (or
@@ -180,6 +184,7 @@ reasoning behind these choices.
 │   │   ├── home/           Home page (family-tree canvas: pan, zoom)
 │   │   ├── landing/        Website home page for visitors (/)
 │   │   ├── legal/          Privacy, Terms and Security pages
+│   │   ├── welcome/        Welcome slides (Android app, first launch)
 │   │   ├── profile/        Profile page (name, picture, password reset link)
 │   │   ├── settings/       Settings page (theme, remember last position)
 │   │   ├── shared/         Floating menu, profile button and notifications bell (no header bar)
@@ -197,6 +202,7 @@ reasoning behind these choices.
 ├── firestore.indexes.json  Firestore indexes
 ├── Dockerfile, compose.yaml  Single-container local development
 ├── angular.json            Angular build configuration
+├── android/                Android app (Capacitor project, icon, launch screen)
 ├── capacitor.config.ts     Capacitor (native apps) configuration
 └── package.json
 ```
@@ -302,6 +308,7 @@ delivered. Their links appear in the emulator log and the Emulator UI.
 | `npm run test:unit` | Unit tests (Vitest) |
 | `npm run test:rules` | Firestore Security Rules tests (starts the Firestore emulator) |
 | `npm run test:e2e` | End-to-end tests against fresh emulators (run `npx playwright install chromium` once first) |
+| `npm run android:sync -- uat` | Build the Android app's web files for UAT (or `prod`) and copy them into `android/` ([details](docs/ANDROID.md)) |
 | `npm run screenshots` | Recapture the README screenshots (made-up demo family, fresh emulators) into `docs/screenshots/` |
 | `npm test` | All of the above tests |
 
