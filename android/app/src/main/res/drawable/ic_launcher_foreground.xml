@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Generations mark: two parents joined to a child (Ionicons "git-network-outline",
+  MIT; same glyph as public/icons). Scaled into the adaptive-icon safe zone.
+  Also used as the themed (monochrome) icon.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.56"
+        android:scaleY="0.56">
+        <path
+            android:pathData="M80,96a48,48 0,1 0,96 0a48,48 0,1 0,-96 0M208,416a48,48 0,1 0,96 0a48,48 0,1 0,-96 0M336,96a48,48 0,1 0,96 0a48,48 0,1 0,-96 0M256,256v112M128,144c0,74.67 68.92,112 128,112M384,144c0,74.67 -68.92,112 -128,112"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="32"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

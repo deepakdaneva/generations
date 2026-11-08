@@ -1,15 +1,22 @@
 import type { Routes } from '@angular/router';
 
-import { adminGuard, authGuard, guestGuard } from './core/guards';
+import { adminGuard, appStartGuard, authGuard, guestGuard } from './core/guards';
 
 export const routes: Routes = [
   {
-    // Website home page; signed-in users go straight to their tree.
+    // Website home page; signed-in users go straight to their tree. The
+    // Android app shows its welcome slides (first launch) or sign-in instead.
     path: '',
     pathMatch: 'full',
     title: 'Generations · Every family has a story',
-    canActivate: [guestGuard],
+    canActivate: [guestGuard, appStartGuard],
     loadComponent: () => import('./landing/landing.page').then((m) => m.LandingPage),
+  },
+  {
+    path: 'welcome',
+    title: 'Welcome · Generations',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./welcome/welcome.page').then((m) => m.WelcomePage),
   },
   {
     path: 'privacy',

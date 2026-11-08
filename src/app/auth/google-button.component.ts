@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { Capacitor } from '@capacitor/core';
 import { IonButton, IonIcon, IonSpinner, ToastController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { logoGoogle } from 'ionicons/icons';
@@ -11,16 +12,20 @@ import { authErrorMessage } from './auth-errors';
 /** "Continue with Google" button shared by the sign-in and registration pages. */
 @Component({
   selector: 'app-google-button',
+  // ponytail: hidden in the Android app, where Google's sign-in popup cannot open.
+  // A native sign-in plugin brings it back there (planned).
   template: `
-    <div class="divider"><span>or</span></div>
-    <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="signIn()">
-      @if (busy()) {
-        <ion-spinner name="crescent"></ion-spinner>
-      } @else {
-        <ion-icon slot="start" name="logo-google" aria-hidden="true"></ion-icon>
-        Continue with Google
-      }
-    </ion-button>
+    @if (!native) {
+      <div class="divider"><span>or</span></div>
+      <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="signIn()">
+        @if (busy()) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+          <ion-icon slot="start" name="logo-google" aria-hidden="true"></ion-icon>
+          Continue with Google
+        }
+      </ion-button>
+    }
   `,
   styles: `
     .divider {
@@ -45,6 +50,7 @@ export class GoogleButtonComponent {
   private readonly router = inject(Router);
   private readonly toasts = inject(ToastController);
   protected readonly busy = signal(false);
+  protected readonly native = Capacitor.isNativePlatform();
 
   constructor() {
     addIcons({ logoGoogle });

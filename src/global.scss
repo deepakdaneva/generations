@@ -119,3 +119,12 @@ ion-menu ion-item.selected {
     --height: min(820px, 92vh);
   }
 }
+
+// Android app, edge to edge: the WebView may report env(safe-area-inset-*) as
+// 0, so Capacitor also provides --safe-area-inset-*. Use whichever is larger.
+:root {
+  --ion-safe-area-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --ion-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --ion-safe-area-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+  --ion-safe-area-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+}

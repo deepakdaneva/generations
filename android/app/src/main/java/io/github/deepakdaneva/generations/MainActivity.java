@@ -1,0 +1,15 @@
+package io.github.deepakdaneva.generations;
+
+import android.os.Bundle;
+import androidx.core.splashscreen.SplashScreen;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        // Animated launch screen on every Android version (core-splashscreen).
+        SplashScreen.installSplashScreen(this);
+        super.onCreate(savedInstanceState);
+    }
+}
