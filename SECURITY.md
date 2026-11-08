@@ -16,6 +16,13 @@ security fixes.
 
 ## Security model
 
+- **Your family tree is yours.** Only you can read and change your tree and
+  its photos. Admins manage accounts but cannot read anyone else's tree. The
+  operator of the Firebase project can read stored data: the tree is not yet
+  encrypted on your device (end-to-end encryption is planned). See the
+  [Privacy Policy](docs/PRIVACY.md).
+- **Encrypted in transit and at rest:** all traffic uses HTTPS, and Google
+  encrypts stored data on its servers.
 - **Authorization is in Firestore Security Rules** (`firestore.rules`, tested in
   `tests/rules/`). The UI only hides things.
 - **Accounts:** email + password (verified email required) or Google. New

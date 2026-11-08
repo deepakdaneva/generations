@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   IonBackButton,
   IonButtons,
@@ -25,6 +26,7 @@ const REPO = 'https://github.com/deepakdaneva/generations';
   styleUrls: ['about.page.scss'],
   imports: [
     DatePipe,
+    RouterLink,
     IonBackButton,
     IonButtons,
     IonContent,

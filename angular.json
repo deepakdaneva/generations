@@ -36,6 +36,16 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "*.html",
+                "input": "src/generated/legal",
+                "output": "legal"
+              },
+              {
+                "glob": "{family-tree,family-tree-dark,mobile}.png",
+                "input": "docs/screenshots",
+                "output": "screenshots"
               }
             ],
             "styles": ["src/global.scss", "src/theme/variables.scss"],

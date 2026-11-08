@@ -4,6 +4,32 @@ import { adminGuard, authGuard, guestGuard } from './core/guards';
 
 export const routes: Routes = [
   {
+    // Website home page; signed-in users go straight to their tree.
+    path: '',
+    pathMatch: 'full',
+    title: 'Generations · Every family has a story',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./landing/landing.page').then((m) => m.LandingPage),
+  },
+  {
+    path: 'privacy',
+    title: 'Privacy Policy · Generations',
+    data: { doc: 'privacy' },
+    loadComponent: () => import('./legal/legal.page').then((m) => m.LegalPage),
+  },
+  {
+    path: 'terms',
+    title: 'Terms of Service · Generations',
+    data: { doc: 'terms' },
+    loadComponent: () => import('./legal/legal.page').then((m) => m.LegalPage),
+  },
+  {
+    path: 'security',
+    title: 'Security · Generations',
+    data: { doc: 'security' },
+    loadComponent: () => import('./legal/legal.page').then((m) => m.LegalPage),
+  },
+  {
     path: 'login',
     title: 'Sign in · Generations',
     canActivate: [guestGuard],
@@ -44,6 +70,5 @@ export const routes: Routes = [
     title: 'About · Generations',
     loadComponent: () => import('./about/about.page').then((m) => m.AboutPage),
   },
-  { path: '', redirectTo: 'home', pathMatch: 'full' },
-  { path: '**', redirectTo: 'home' },
+  { path: '**', redirectTo: '' },
 ];
