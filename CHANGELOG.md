@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/deepakdaneva/generations/compare/v1.1.0...v1.2.0) (2026-11-08)
+
+
+### Features
+
+* website home page and privacy, terms and security pages ([#26](https://github.com/deepakdaneva/generations/issues/26)) ([7e15acc](https://github.com/deepakdaneva/generations/commit/7e15acc60e0ca075e50306c90799d2477159870d))
+
 ## [1.1.0](https://github.com/deepakdaneva/generations/compare/v1.0.0...v1.1.0) (2026-11-04)
 
 
