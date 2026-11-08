@@ -215,6 +215,27 @@ of a home-made algorithm. It is the only new runtime dependency.
   upgrade path if large trees ever stutter.
 - Pan and zoom are plain pointer events and a CSS transform, with no library.
 
+### D14. Website home page and policy pages
+
+- `/` is a public landing page (`src/app/landing/`) for visitors; the
+  `guestGuard` sends signed-in users to `/home`. Unknown URLs go to `/`.
+  Its screenshots are the README's (`docs/screenshots/`), copied into the
+  build as `/screenshots/` by `angular.json`, so there is one set to keep
+  current (`npm run screenshots`).
+- `/privacy`, `/terms` and `/security` show `docs/PRIVACY.md`,
+  `docs/TERMS.md` and `SECURITY.md`. `scripts/render-legal.mjs` renders them
+  to HTML with [marked](https://marked.js.org/) (a pinned dev dependency,
+  approved by the maintainer) before `npm start` and `npm run build`, into
+  the git-ignored `src/generated/legal/`, published as `/legal/*.html`. So
+  every build shows the documents of its own branch, with one source of truth
+  that also reads well on GitHub. Raw HTML in the markdown is dropped; links
+  between the three documents stay in the app, other relative links point to
+  GitHub on the same branch (`main` for production builds, `development`
+  otherwise). `src/app/legal/legal.page.ts` fetches the file and Angular
+  sanitizes it before display.
+- Change the policies by editing the markdown; keep them true to how the app
+  works (data model, rules, providers) whenever those change.
+
 ### D7. Local development on the Emulator Suite
 
 `npm run dev` runs `firebase emulators:exec`, which starts the Auth and

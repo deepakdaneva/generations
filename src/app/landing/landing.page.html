@@ -1,0 +1,84 @@
+<ion-content>
+  <header class="hero">
+    <nav class="container nav" aria-label="Main">
+      <a class="brand" routerLink="/">
+        <img src="icons/icon.svg" alt="" width="32" height="32" />
+        <span>Generations</span>
+      </a>
+      <ion-button class="on-hero" size="small" fill="outline" routerLink="/login">Sign in</ion-button>
+    </nav>
+
+    <div class="container hero-body">
+      <div class="hero-text">
+        <p class="pill">Free · Open source · Private by default</p>
+        <h1>Every family has a story.</h1>
+        <p class="lead">
+          Build your family tree, keep the photos and dates that matter, and remember everyone, across generations.
+        </p>
+        <div class="cta">
+          <ion-button class="start" size="large" routerLink="/register">Get started</ion-button>
+          <ion-button class="on-hero" size="large" fill="clear" [href]="repo" target="_blank" rel="noopener">
+            <ion-icon slot="start" name="logo-github" aria-hidden="true"></ion-icon>
+            View source
+          </ion-button>
+        </div>
+      </div>
+      <img
+        class="shot light"
+        src="screenshots/family-tree.png"
+        alt="A family tree with three generations, spouses and labelled lines"
+      />
+      <img class="shot dark" src="screenshots/family-tree-dark.png" alt="The family tree in dark mode" />
+    </div>
+  </header>
+
+  <main>
+    <section class="container section" aria-labelledby="features-title">
+      <h2 id="features-title">Your family, all in one place</h2>
+      <div class="grid">
+        @for (f of features; track f.title) {
+        <article class="card">
+          <ion-icon [name]="f.icon" color="primary" aria-hidden="true"></ion-icon>
+          <h3>{{ f.title }}</h3>
+          <p>{{ f.text }}</p>
+        </article>
+        }
+      </div>
+    </section>
+
+    <section class="container section split" aria-labelledby="privacy-title">
+      <div>
+        <h2 id="privacy-title">Your tree stays yours</h2>
+        <ul>
+          <li>Only you can read and change your family tree and its photos. Admins manage accounts, not trees.</li>
+          <li>Strangers cannot join by signing up: new accounts wait for an admin's approval.</li>
+          <li>No ads, no analytics, no tracking. Photos are shrunk on your device before they are saved.</li>
+        </ul>
+        <p><a routerLink="/privacy">Privacy policy</a> · <a routerLink="/security">How your data is protected</a></p>
+      </div>
+      <img class="phone" src="screenshots/mobile.png" alt="The family tree on a phone" loading="lazy" />
+    </section>
+
+    <section class="container section" aria-labelledby="platforms-title">
+      <h2 id="platforms-title">Web today, Android next</h2>
+      <p class="platforms">
+        <span><ion-icon name="globe-outline" aria-hidden="true"></ion-icon> Web and installable app</span>
+        <span><ion-icon name="logo-android" aria-hidden="true"></ion-icon> Android app coming soon</span>
+      </p>
+      <p class="muted">
+        Generations is MIT licensed and runs on Firebase's free plan. Anyone can host their own copy for their family.
+      </p>
+    </section>
+  </main>
+
+  <footer class="container footer">
+    <span>© {{ year }} Deepak Kumar Jangir and contributors · MIT</span>
+    <nav aria-label="Footer">
+      <a routerLink="/privacy">Privacy</a>
+      <a routerLink="/terms">Terms</a>
+      <a routerLink="/security">Security</a>
+      <a routerLink="/about">About</a>
+      <a [href]="repo" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </footer>
+</ion-content>

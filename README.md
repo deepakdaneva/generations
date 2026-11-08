@@ -64,6 +64,13 @@ reasoning behind these choices.
 
 ## Features
 
+- **Website home page** (`/`): what Generations does, how your data is kept
+  private, and links to sign in or create an account. Signed-in users go
+  straight to their family tree.
+- **Privacy Policy, Terms of Service and Security** pages (`/privacy`,
+  `/terms`, `/security`), public and linked from the home page, sign-in,
+  registration and About. Their text lives in [docs/PRIVACY.md](docs/PRIVACY.md),
+  [docs/TERMS.md](docs/TERMS.md) and [SECURITY.md](SECURITY.md).
 - Email + password sign-in, self-registration, and mandatory email verification
   (unverified accounts cannot sign in or read any data). New accounts wait for
   an admin's approval before they can use the app, unless the project's
@@ -171,6 +178,8 @@ reasoning behind these choices.
 │   │   ├── auth/           Sign-in and registration pages
 │   │   ├── core/           Firebase setup, AuthService, route guards
 │   │   ├── home/           Home page (family-tree canvas: pan, zoom)
+│   │   ├── landing/        Website home page for visitors (/)
+│   │   ├── legal/          Privacy, Terms and Security pages
 │   │   ├── profile/        Profile page (name, picture, password reset link)
 │   │   ├── settings/       Settings page (theme, remember last position)
 │   │   ├── shared/         Floating menu, profile button and notifications bell (no header bar)
@@ -180,7 +189,7 @@ reasoning behind these choices.
 │   ├── environments/       Local vs deployed build settings
 │   └── theme/              Ionic theme variables
 ├── public/                 PWA manifest and app icons (copied to the site root)
-├── scripts/                Emulator seed data, emulator runner, icon generator
+├── scripts/                Emulator seed data, emulator runner, icon generator, policy renderer
 ├── tests/rules/            Firestore Security Rules tests
 ├── firebase.json           Hosting, Firestore and emulator configuration
 ├── .firebaserc             Firebase project aliases

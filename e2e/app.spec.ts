@@ -110,6 +110,18 @@ test('redirects signed-out visitors to the login page', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Generations' })).toBeVisible();
 });
 
+test('visitors see the home page and the rendered privacy policy', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Every family has a story.' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Footer' }).getByRole('link', { name: 'Privacy' }).click();
+  await expect(page).toHaveURL(/\/privacy$/);
+  await expect(page.getByRole('heading', { name: 'Who runs this service' })).toBeVisible();
+  // Links between the policies stay in the app.
+  await page.getByRole('link', { name: 'Security policy' }).click();
+  await expect(page).toHaveURL(/\/security$/);
+  await expect(page.getByRole('heading', { name: 'Security model' })).toBeVisible();
+});
+
 test('normal user sees Home without the menu and cannot open User Management', async ({ page }) => {
   await login(page, 'user@generations.test');
   await expect(page).toHaveURL(/\/home$/);
