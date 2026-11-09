@@ -3,7 +3,8 @@
 **Every family has a story.** Generations helps families build, maintain and
 explore their family tree and family hierarchy.
 
-**Use it:** <https://generations-prod.web.app> (Production). It runs as an
+**Use it:** <https://generations-prod.web.app> (Production), or the Android app
+from the [latest release](https://github.com/deepakdaneva/generations/releases/latest). It runs as an
 installable Progressive Web App (PWA) on the web, iOS and Android, and is
 designed to grow into dedicated native apps later. New features are tried
 first on the UAT test environment, <https://generations-uat.web.app>.
@@ -161,7 +162,7 @@ reasoning behind these choices.
   desktop; it opens full screen, starts offline, and offers a reload when a new
   version is deployed.
 
-- **Android app** (in development): the same app with an adaptive icon, an
+- **Android app** ([download the APK](https://github.com/deepakdaneva/generations/releases/latest) from the latest release): the same app with an adaptive icon, an
   animated launch screen and welcome slides on first launch; see
   [docs/ANDROID.md](docs/ANDROID.md). Pull requests build a test APK; each
   release attaches a signed APK to its GitHub release.
