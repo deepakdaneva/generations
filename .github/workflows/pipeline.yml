@@ -3,6 +3,7 @@
 #   main        -> Production (generations-prod, waits for maintainer approval)
 # Pushes to feature branches run nothing; test those locally (see README).
 # Google access is keyless (Workload Identity Federation), see docs/DEPLOYMENT.md.
+# After each deploy, android-release builds a signed APK (see docs/ANDROID.md).
 name: Pipeline
 
 on:
@@ -141,3 +142,83 @@ jobs:
       - run: npx firebase deploy --project "$PROJECT" --only hosting,firestore --non-interactive
         env:
           PROJECT: ${{ github.ref_name == 'main' && 'prod' || 'uat' }}
+
+  android-release:
+    # After a successful deploy, package the same commit as a signed APK:
+    #   development -> UAT APK (io.github.deepakdaneva.generations.uat,
+    #                  "Generations UAT") as a run artifact for 30 days
+    #   main        -> production APK attached to the GitHub release vX.Y.Z
+    #                  that release-please created
+    # The APK is built unsigned and signed afterwards with apksigner, so the key
+    # is only present in that one step (repository secrets
+    # ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD; see docs/ANDROID.md).
+    name: Android release
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # upload the APK to the GitHub release (main only)
+    env:
+      PROD: ${{ github.ref_name == 'main' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run android:sync -- "$([ "$PROD" = true ] && echo prod || echo uat)"
+
+      - name: Unit tests, lint, release APK (unsigned)
+        working-directory: android
+        run: |
+          VERSION=$(node -p "require('../package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          EXTRA=()
+          if [ "$PROD" != true ]; then EXTRA=(-PappIdSuffix=.uat "-PappName=Generations UAT"); fi
+          ./gradlew testReleaseUnitTest lintRelease assembleRelease --no-daemon \
+            "-PversionCode=$GITHUB_RUN_NUMBER" "-PversionName=$VERSION" "${EXTRA[@]}"
+
+      - name: Sign and verify
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then echo "::error::Signing secrets missing (see docs/ANDROID.md)"; exit 1; fi
+          if [ "$PROD" = true ]; then NAME=Generations PACKAGE=io.github.deepakdaneva.generations
+          else NAME=Generations-UAT PACKAGE=io.github.deepakdaneva.generations.uat; fi
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          KS="$RUNNER_TEMP/release.jks"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
+          OUT="$NAME-$VERSION-$GITHUB_RUN_NUMBER.apk"
+          "$BT/apksigner" sign --ks "$KS" --ks-pass env:KS_PASS --ks-key-alias generations \
+            --out "$OUT" android/app/build/outputs/apk/release/app-release-unsigned.apk
+          rm -f "$KS"
+          "$BT/apksigner" verify --print-certs "$OUT" # fails on a bad signature; prints the public certificate
+          BADGING=$("$BT/aapt2" dump badging "$OUT" | head -1)
+          echo "$BADGING"
+          echo "$BADGING" | grep -q "name='$PACKAGE' versionCode='$GITHUB_RUN_NUMBER' versionName='$VERSION'" \
+            || { echo "::error::APK package or version mismatch"; exit 1; }
+          sha256sum "$OUT" > "$OUT.sha256"
+          echo "APK=$OUT" >> "$GITHUB_ENV"
+
+      - name: Upload UAT APK
+        if: github.ref_name != 'main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-uat-apk
+          path: Generations-UAT-*
+          retention-days: 30
+
+      - name: Attach to the GitHub release
+        if: github.ref_name == 'main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "v$VERSION" "$APK" "$APK.sha256" --clobber --repo "$GITHUB_REPOSITORY"
