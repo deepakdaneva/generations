@@ -1,8 +1,41 @@
 import type { Routes } from '@angular/router';
 
-import { adminGuard, authGuard, guestGuard } from './core/guards';
+import { adminGuard, appStartGuard, authGuard, guestGuard } from './core/guards';
 
 export const routes: Routes = [
+  {
+    // Website home page; signed-in users go straight to their tree. The
+    // Android app shows its welcome slides (first launch) or sign-in instead.
+    path: '',
+    pathMatch: 'full',
+    title: 'Generations · Every family has a story',
+    canActivate: [guestGuard, appStartGuard],
+    loadComponent: () => import('./landing/landing.page').then((m) => m.LandingPage),
+  },
+  {
+    path: 'welcome',
+    title: 'Welcome · Generations',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./welcome/welcome.page').then((m) => m.WelcomePage),
+  },
+  {
+    path: 'privacy',
+    title: 'Privacy Policy · Generations',
+    data: { doc: 'privacy' },
+    loadComponent: () => import('./legal/legal.page').then((m) => m.LegalPage),
+  },
+  {
+    path: 'terms',
+    title: 'Terms of Service · Generations',
+    data: { doc: 'terms' },
+    loadComponent: () => import('./legal/legal.page').then((m) => m.LegalPage),
+  },
+  {
+    path: 'security',
+    title: 'Security · Generations',
+    data: { doc: 'security' },
+    loadComponent: () => import('./legal/legal.page').then((m) => m.LegalPage),
+  },
   {
     path: 'login',
     title: 'Sign in · Generations',
@@ -44,6 +77,5 @@ export const routes: Routes = [
     title: 'About · Generations',
     loadComponent: () => import('./about/about.page').then((m) => m.AboutPage),
   },
-  { path: '', redirectTo: 'home', pathMatch: 'full' },
-  { path: '**', redirectTo: 'home' },
+  { path: '**', redirectTo: '' },
 ];

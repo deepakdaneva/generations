@@ -92,3 +92,11 @@ ui-debug.log
 database-debug.log
 pubsub-debug.log
 /emulator-data
+
+# Generated at build time (scripts/render-legal.mjs)
+/src/generated
+
+# Android signing keys: never commit
+*.jks
+*.keystore
+*.kjs

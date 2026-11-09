@@ -11,16 +11,20 @@ import { authErrorMessage } from './auth-errors';
 /** "Continue with Google" button shared by the sign-in and registration pages. */
 @Component({
   selector: 'app-google-button',
+  // In the Android app it uses Google's account picker; hidden there when the
+  // Firebase project has no web client ID (src/environments/google-sign-in.ts).
   template: `
-    <div class="divider"><span>or</span></div>
-    <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="signIn()">
-      @if (busy()) {
-        <ion-spinner name="crescent"></ion-spinner>
-      } @else {
-        <ion-icon slot="start" name="logo-google" aria-hidden="true"></ion-icon>
-        Continue with Google
-      }
-    </ion-button>
+    @if (auth.googleAvailable) {
+      <div class="divider"><span>or</span></div>
+      <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="signIn()">
+        @if (busy()) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+          <ion-icon slot="start" name="logo-google" aria-hidden="true"></ion-icon>
+          Continue with Google
+        }
+      </ion-button>
+    }
   `,
   styles: `
     .divider {
@@ -41,7 +45,7 @@ import { authErrorMessage } from './auth-errors';
   imports: [IonButton, IonIcon, IonSpinner],
 })
 export class GoogleButtonComponent {
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toasts = inject(ToastController);
   protected readonly busy = signal(false);

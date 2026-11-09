@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { Router, type CanActivateFn } from '@angular/router';
+import { Capacitor } from '@capacitor/core';
 import { filter, map, take } from 'rxjs';
 
 import { AuthService } from './auth.service';
@@ -25,3 +26,21 @@ export const adminGuard: CanActivateFn = () =>
 
 export const guestGuard: CanActivateFn = () =>
   afterAuth((auth, router) => (auth.profile() ? router.createUrlTree(['/home']) : true));
+
+/** localStorage flag: the welcome slides were seen (set by WelcomePage). */
+export const WELCOME_SEEN = 'generations.welcome.seen';
+
+/**
+ * The Android app has no website home page: the first launch shows the
+ * welcome slides, later launches go straight to sign-in.
+ */
+export const appStartGuard: CanActivateFn = () => {
+  if (!Capacitor.isNativePlatform()) return true;
+  let seen = false;
+  try {
+    seen = localStorage.getItem(WELCOME_SEEN) === '1';
+  } catch {
+    // Storage unavailable: show the slides.
+  }
+  return inject(Router).createUrlTree([seen ? '/login' : '/welcome']);
+};

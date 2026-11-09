@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launch animation (core-splashscreen): the two parents appear, their lines
+  grow down and join, then the child appears. Android 12+ animates it; older
+  versions show the finished mark. Glyph as in ic_launcher_foreground.xml.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="288dp"
+            android:height="288dp"
+            android:viewportWidth="512"
+            android:viewportHeight="512">
+            <group android:pivotX="256" android:pivotY="256" android:scaleX="0.48" android:scaleY="0.48">
+                <path
+                    android:name="lineLeft"
+                    android:pathData="M128,144c0,74.67 68.92,112 128,112"
+                    android:strokeColor="#FFFFFF"
+                    android:strokeWidth="32"
+                    android:strokeLineCap="round"
+                    android:trimPathEnd="0" />
+                <path
+                    android:name="lineRight"
+                    android:pathData="M384,144c0,74.67 -68.92,112 -128,112"
+                    android:strokeColor="#FFFFFF"
+                    android:strokeWidth="32"
+                    android:strokeLineCap="round"
+                    android:trimPathEnd="0" />
+                <path
+                    android:name="stem"
+                    android:pathData="M256,256v112"
+                    android:strokeColor="#FFFFFF"
+                    android:strokeWidth="32"
+                    android:strokeLineCap="round"
+                    android:trimPathEnd="0" />
+                <group android:name="parentLeft" android:pivotX="128" android:pivotY="96" android:scaleX="0" android:scaleY="0">
+                    <path
+                        android:pathData="M80,96a48,48 0,1 0,96 0a48,48 0,1 0,-96 0"
+                        android:strokeColor="#FFFFFF"
+                        android:strokeWidth="32" />
+                </group>
+                <group android:name="parentRight" android:pivotX="384" android:pivotY="96" android:scaleX="0" android:scaleY="0">
+                    <path
+                        android:pathData="M336,96a48,48 0,1 0,96 0a48,48 0,1 0,-96 0"
+                        android:strokeColor="#FFFFFF"
+                        android:strokeWidth="32" />
+                </group>
+                <group android:name="child" android:pivotX="256" android:pivotY="416" android:scaleX="0" android:scaleY="0">
+                    <path
+                        android:pathData="M208,416a48,48 0,1 0,96 0a48,48 0,1 0,-96 0"
+                        android:strokeColor="#FFFFFF"
+                        android:strokeWidth="32" />
+                </group>
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <target android:name="parentLeft">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="scaleX" android:duration="260" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/overshoot" />
+                <objectAnimator android:propertyName="scaleY" android:duration="260" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/overshoot" />
+            </set>
+        </aapt:attr>
+    </target>
+    <target android:name="parentRight">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="scaleX" android:startOffset="120" android:duration="260" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/overshoot" />
+                <objectAnimator android:propertyName="scaleY" android:startOffset="120" android:duration="260" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/overshoot" />
+            </set>
+        </aapt:attr>
+    </target>
+    <target android:name="lineLeft">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="trimPathEnd" android:startOffset="320" android:duration="320" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/fast_out_slow_in" />
+        </aapt:attr>
+    </target>
+    <target android:name="lineRight">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="trimPathEnd" android:startOffset="320" android:duration="320" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/fast_out_slow_in" />
+        </aapt:attr>
+    </target>
+    <target android:name="stem">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="trimPathEnd" android:startOffset="620" android:duration="200" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/linear_out_slow_in" />
+        </aapt:attr>
+    </target>
+    <target android:name="child">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="scaleX" android:startOffset="780" android:duration="260" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/overshoot" />
+                <objectAnimator android:propertyName="scaleY" android:startOffset="780" android:duration="260" android:valueFrom="0" android:valueTo="1" android:valueType="floatType" android:interpolator="@android:interpolator/overshoot" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>

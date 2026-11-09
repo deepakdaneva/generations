@@ -8,6 +8,7 @@ import {
   PreloadAllModules,
 } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
+import { Capacitor } from '@capacitor/core';
 import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular';
 
 import { AppComponent } from './app/app.component';
@@ -26,7 +27,8 @@ initFirebase().then(({ auth, db }) =>
       { provide: AUTH, useValue: auth },
       { provide: FIRESTORE, useValue: db },
       provideServiceWorker('ngsw-worker.js', {
-        enabled: !isDevMode(),
+        // The Android app ships its files in the APK; a service worker would only add a stale copy.
+        enabled: !isDevMode() && !Capacitor.isNativePlatform(),
         registrationStrategy: 'registerWhenStable:30000',
       }),
     ],

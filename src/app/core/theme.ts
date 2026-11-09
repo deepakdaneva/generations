@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -19,6 +20,10 @@ export function applyTheme(mode: ThemeMode = storedMode()): void {
   const dark = mode === 'dark' || (mode === 'system' && systemDark.matches);
   document.documentElement.classList.toggle('ion-palette-dark', dark);
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+  // Android app: status and navigation bar icons follow the app theme.
+  if (Capacitor.isNativePlatform()) {
+    void SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => undefined);
+  }
 }
 
 /**

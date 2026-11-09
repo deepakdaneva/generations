@@ -41,12 +41,16 @@ Angular is Ionic's primary integration and ships the router, forms, HTTP client
 and service worker in the box, which keeps third-party dependencies to a
 minimum. Standalone components and lazy-loaded routes keep the code modular.
 
-### D3. Capacitor for future native apps
+### D3. Capacitor for native apps
 
-The project already includes Capacitor 8 configuration
-(`capacitor.config.ts`, app id `io.github.deepakdaneva.generations`). Native iOS and
-Android projects are added later with `npx cap add ios|android`; the web code
-stays the same.
+Capacitor 8 (`capacitor.config.ts`, app id `io.github.deepakdaneva.generations`)
+packages the same web build as an Android app (`android/`, see
+[ANDROID.md](ANDROID.md)); an iOS project can be added later with
+`npx cap add ios`. Native-only behaviour is kept small and checked with
+`Capacitor.isNativePlatform()`: the start page (welcome slides instead of the
+website home page), no service worker, system-bar colours, and no Google
+popup (Google sign-in uses Android's account picker through
+`@capgo/capacitor-social-login`, then `signInWithCredential`).
 
 ### D4. Modular Firebase JS SDK, no AngularFire
 
@@ -82,9 +86,9 @@ config of the project it is deployed to. One build artifact therefore works
 for UAT, Production and forks, and switching environments means choosing a
 different `firebase deploy --project` target, not editing code.
 
-Native builds (later) have no Hosting origin; they will fetch the same file
-from the deployed site or have the config written in at build time.
-`src/app/core/firebase.ts` is the only place that needs to change.
+The Android app has no Hosting origin: `scripts/prepare-android.mjs` downloads
+the same file from the deployed site while packaging and ships it at the same
+path inside the APK, so `src/app/core/firebase.ts` has no native branch.
 
 ### D9. Installable PWA
 
@@ -214,6 +218,27 @@ of a home-made algorithm. It is the only new runtime dependency.
   is not in the main bundle. It runs on the main thread; its web worker is the
   upgrade path if large trees ever stutter.
 - Pan and zoom are plain pointer events and a CSS transform, with no library.
+
+### D14. Website home page and policy pages
+
+- `/` is a public landing page (`src/app/landing/`) for visitors; the
+  `guestGuard` sends signed-in users to `/home`. Unknown URLs go to `/`.
+  Its screenshots are the README's (`docs/screenshots/`), copied into the
+  build as `/screenshots/` by `angular.json`, so there is one set to keep
+  current (`npm run screenshots`).
+- `/privacy`, `/terms` and `/security` show `docs/PRIVACY.md`,
+  `docs/TERMS.md` and `SECURITY.md`. `scripts/render-legal.mjs` renders them
+  to HTML with [marked](https://marked.js.org/) (a pinned dev dependency,
+  approved by the maintainer) before `npm start` and `npm run build`, into
+  the git-ignored `src/generated/legal/`, published as `/legal/*.html`. So
+  every build shows the documents of its own branch, with one source of truth
+  that also reads well on GitHub. Raw HTML in the markdown is dropped; links
+  between the three documents stay in the app, other relative links point to
+  GitHub on the same branch (`main` for production builds, `development`
+  otherwise). `src/app/legal/legal.page.ts` fetches the file and Angular
+  sanitizes it before display.
+- Change the policies by editing the markdown; keep them true to how the app
+  works (data model, rules, providers) whenever those change.
 
 ### D7. Local development on the Emulator Suite
 
@@ -419,7 +444,9 @@ emulator (`npm run test:rules`).
    email already has a password account, Firebase's one-account-per-email
    setting decides; the app shows a clear message for
    `auth/account-exists-with-different-credential`. Popups do not work inside
-   Capacitor's native WebView, so native apps will need a native sign-in plugin.
+   Capacitor's native WebView, so the Android app signs in with Google's
+   account picker (Credential Manager) and passes the ID token to
+   `signInWithCredential`; see [ANDROID.md](ANDROID.md#google-sign-in).
 6. **Admin creates a user:** the admin enters only name, email and role. A
    temporary second Firebase app instance creates the account with a random
    password nobody sees (so the admin stays signed in), the admin writes the

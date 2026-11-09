@@ -211,11 +211,13 @@ created by Firebase)" → **Application restrictions: Websites**:
 
 | Project | Allowed websites |
 |---|---|
-| `generations-uat` | `https://generations-uat.web.app/*`, `https://generations-uat.firebaseapp.com/*` |
-| `generations-prod` | `https://generations-prod.web.app/*`, `https://generations-prod.firebaseapp.com/*` |
+| `generations-uat` | `https://generations-uat.web.app/*`, `https://generations-uat.firebaseapp.com/*`, `https://localhost/*` (Android app) |
+| `generations-prod` | `https://generations-prod.web.app/*`, `https://generations-prod.firebaseapp.com/*`, `https://localhost/*` (Android app) |
 
 - Keep the `firebaseapp.com` entry: Google sign-in runs on that domain.
-- Do not add `localhost`; local development uses the emulators, not these keys.
+- Add `https://localhost/*` only for the Android app (see
+  [ANDROID.md](ANDROID.md#firebase-configuration)); local web development
+  uses the emulators, not these keys.
 - Leave **API restrictions** unchanged.
 
 Check a key (replace `KEY` and the site). An allowed site answers
@@ -243,7 +245,8 @@ Setting up a project:
 1. Google Cloud console → **Security → reCAPTCHA** → **Create key**: Web,
    domains `<project>.web.app` and `<project>.firebaseapp.com`, **checkbox
    challenge off** (score-based; a checkbox key fails with
-   `appCheck/recaptcha-error`), no `localhost`.
+   `appCheck/recaptcha-error`). Add `localhost` only for the Android app
+   (see [ANDROID.md](ANDROID.md#firebase-configuration)).
 2. Firebase console → **App Check → Apps** → the web app → reCAPTCHA
    Enterprise → paste the key.
 3. Add the key to `src/environments/app-check.ts` and deploy.
