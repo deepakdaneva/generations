@@ -95,3 +95,8 @@ pubsub-debug.log
 
 # Generated at build time (scripts/render-legal.mjs)
 /src/generated
+
+# Android signing keys: never commit
+*.jks
+*.keystore
+*.kjs

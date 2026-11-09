@@ -162,7 +162,8 @@ reasoning behind these choices.
 
 - **Android app** (in development): the same app with an adaptive icon, an
   animated launch screen and welcome slides on first launch; see
-  [docs/ANDROID.md](docs/ANDROID.md). Pull requests build a test APK.
+  [docs/ANDROID.md](docs/ANDROID.md). Pull requests build a test APK; each
+  release attaches a signed APK to its GitHub release.
 
 ### Install on a phone
 
