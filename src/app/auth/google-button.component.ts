@@ -1,6 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Capacitor } from '@capacitor/core';
 import { IonButton, IonIcon, IonSpinner, ToastController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { logoGoogle } from 'ionicons/icons';
@@ -12,10 +11,10 @@ import { authErrorMessage } from './auth-errors';
 /** "Continue with Google" button shared by the sign-in and registration pages. */
 @Component({
   selector: 'app-google-button',
-  // ponytail: hidden in the Android app, where Google's sign-in popup cannot open.
-  // A native sign-in plugin brings it back there (planned).
+  // In the Android app it uses Google's account picker; hidden there when the
+  // Firebase project has no web client ID (src/environments/google-sign-in.ts).
   template: `
-    @if (!native) {
+    @if (auth.googleAvailable) {
       <div class="divider"><span>or</span></div>
       <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="signIn()">
         @if (busy()) {
@@ -46,11 +45,10 @@ import { authErrorMessage } from './auth-errors';
   imports: [IonButton, IonIcon, IonSpinner],
 })
 export class GoogleButtonComponent {
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toasts = inject(ToastController);
   protected readonly busy = signal(false);
-  protected readonly native = Capacitor.isNativePlatform();
 
   constructor() {
     addIcons({ logoGoogle });

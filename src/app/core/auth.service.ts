@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Capacitor } from '@capacitor/core';
 import { deleteApp, initializeApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
@@ -8,6 +9,7 @@ import {
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -29,9 +31,31 @@ import {
 } from 'firebase/firestore';
 
 import { environment } from '../../environments/environment';
+import { googleWebClientIds } from '../../environments/google-sign-in';
 
 import { AUTH, FIRESTORE } from './firebase';
 import { recordResetLink, resetLinksLeft } from './reset-limit';
+
+let socialLoginReady: Promise<unknown> | null = null;
+
+/**
+ * Android app: Google's system account picker (Credential Manager) returns an
+ * ID token that Firebase accepts. No browser popup or redirect. Null when the
+ * user closes the picker.
+ */
+async function nativeGoogleIdToken(webClientId: string): Promise<string | null> {
+  const { SocialLogin } = await import('@capgo/capacitor-social-login');
+  socialLoginReady ??= SocialLogin.initialize({ google: { webClientId } });
+  await socialLoginReady;
+  try {
+    // No custom scopes: the ID token already carries name and email.
+    const { result } = await SocialLogin.login({ provider: 'google', options: {} });
+    return 'idToken' in result ? result.idToken : null;
+  } catch (e) {
+    if (/cancel/i.test(String((e as Error)?.message ?? e))) return null;
+    throw e;
+  }
+}
 
 export type Role = 'admin' | 'user';
 
@@ -99,10 +123,23 @@ export class AuthService {
    * verified email, so the profile is created right away as a normal user.
    * Returns false when the user closed the popup.
    */
+  /** Google sign-in is available: always in browsers, in the Android app when the project has a web client ID. */
+  readonly googleAvailable = !Capacitor.isNativePlatform() || !!this.googleWebClientId();
+
+  private googleWebClientId(): string | undefined {
+    return googleWebClientIds[this.auth.app.options.projectId ?? ''];
+  }
+
   async loginWithGoogle(): Promise<boolean> {
     this.signOutReason.set(null);
     try {
-      await signInWithPopup(this.auth, new GoogleAuthProvider());
+      if (Capacitor.isNativePlatform()) {
+        const idToken = await nativeGoogleIdToken(this.googleWebClientId()!);
+        if (!idToken) return false;
+        await signInWithCredential(this.auth, GoogleAuthProvider.credential(idToken));
+      } else {
+        await signInWithPopup(this.auth, new GoogleAuthProvider());
+      }
       return true;
     } catch (e) {
       const code = (e as { code?: string }).code;

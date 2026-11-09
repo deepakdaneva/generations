@@ -49,7 +49,8 @@ packages the same web build as an Android app (`android/`, see
 `npx cap add ios`. Native-only behaviour is kept small and checked with
 `Capacitor.isNativePlatform()`: the start page (welcome slides instead of the
 website home page), no service worker, system-bar colours, and no Google
-popup sign-in.
+popup (Google sign-in uses Android's account picker through
+`@capgo/capacitor-social-login`, then `signInWithCredential`).
 
 ### D4. Modular Firebase JS SDK, no AngularFire
 
@@ -443,8 +444,9 @@ emulator (`npm run test:rules`).
    email already has a password account, Firebase's one-account-per-email
    setting decides; the app shows a clear message for
    `auth/account-exists-with-different-credential`. Popups do not work inside
-   Capacitor's native WebView, so the Android app hides the Google button until a
-   native sign-in plugin is added.
+   Capacitor's native WebView, so the Android app signs in with Google's
+   account picker (Credential Manager) and passes the ID token to
+   `signInWithCredential`; see [ANDROID.md](ANDROID.md#google-sign-in).
 6. **Admin creates a user:** the admin enters only name, email and role. A
    temporary second Firebase app instance creates the account with a random
    password nobody sees (so the admin stays signed in), the admin writes the
