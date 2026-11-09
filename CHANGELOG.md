@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/deepakdaneva/generations/compare/v1.2.0...v1.3.0) (2026-11-09)
+
+
+### Features
+
+* Android app with icon, animated launch screen and welcome slides ([#28](https://github.com/deepakdaneva/generations/issues/28)) ([aae55b2](https://github.com/deepakdaneva/generations/commit/aae55b24a5343294e6a90538a353018b18651843))
+* Google sign-in in the Android app ([#31](https://github.com/deepakdaneva/generations/issues/31)) ([f36fc7c](https://github.com/deepakdaneva/generations/commit/f36fc7c89e439b3d93c6f1241ae90c9941163ad5))
+
 ## [1.2.0](https://github.com/deepakdaneva/generations/compare/v1.1.0...v1.2.0) (2026-11-08)
 
 
