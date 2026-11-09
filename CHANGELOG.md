@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/deepakdaneva/generations/compare/v1.3.0...v1.3.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* link the Android app download and harden the Gradle download in CI ([eaba649](https://github.com/deepakdaneva/generations/commit/eaba6498b2e4b6cce15b522eec0850a28b0b3e60))
+
 ## [1.3.0](https://github.com/deepakdaneva/generations/compare/v1.2.0...v1.3.0) (2026-11-09)
 
 
