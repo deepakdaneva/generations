@@ -38,16 +38,23 @@ security fixes.
 
 ## Known, accepted advisories
 
-- `firebase` pins `@grpc/grpc-js` to `~1.9` and `firebase-tools` pulls in
-  `uuid@9`, both with known advisories. `package.json` `overrides` lift them to
-  patched versions (`@grpc/grpc-js` 1.14.7+, `uuid` 11.1.1+); the rules and
-  end-to-end tests cover both. Remove an override once upstream catches up.
-- `minimatch` below 11.0.1 (GHSA-g3hv-75wg-m249, denial of service through
-  crafted glob patterns) remains in development tools only: `firebase-tools`,
-  ESLint and their dependencies. They only match patterns from this
-  repository's own configuration, never user input, and v11's API is
-  incompatible with the old versions they require. The alert is dismissed as
-  tolerable risk until those tools update.
+- Dependencies pinned to vulnerable versions upstream are lifted to patched
+  versions with `package.json` `overrides`; the rules and end-to-end tests
+  cover them. Remove an override once upstream catches up:
+  - `@grpc/grpc-js` 1.14.7+ (`firebase` pins `~1.9`).
+  - `uuid` 11.1.1+ (`firebase-tools` pulls in `uuid@9`).
+  - `minimatch` 11.0.1+ for copies from 7.0.0 up (GHSA-g3hv-75wg-m249, denial
+    of service through crafted patterns), used by `firebase-tools`, ESLint and
+    `glob`. The 3.x, 5.x and 6.x copies are not affected.
+  - `glob` 14.0.2+ for copies from 9.0.0 up (GHSA-3g3m-2fjr-6pw4), used by
+    `firebase-tools` and its archiver; its hosting file listing is checked to
+    still work.
+- `@opentelemetry/core` 1.x (GHSA-8988-4f7v-96qf, memory use in W3C baggage
+  parsing) remains inside `firebase-tools`, through `@google-cloud/pubsub` 5,
+  which only the Pub/Sub emulator and Cloud Functions tooling load; this
+  project uses neither, and the CLI never parses baggage headers from others.
+  The fix is a major version that pubsub 5 does not support, so the alert is
+  accepted until `firebase-tools` moves to pubsub 6.
 - `npm audit --omit=dev` reports no vulnerabilities in the app's runtime
   dependencies.
 
