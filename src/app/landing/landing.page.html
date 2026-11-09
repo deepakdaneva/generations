@@ -60,10 +60,15 @@
     </section>
 
     <section class="container section" aria-labelledby="platforms-title">
-      <h2 id="platforms-title">Web today, Android next</h2>
+      <h2 id="platforms-title">On the web and on Android</h2>
       <p class="platforms">
         <span><ion-icon name="globe-outline" aria-hidden="true"></ion-icon> Web and installable app</span>
-        <span><ion-icon name="logo-android" aria-hidden="true"></ion-icon> Android app coming soon</span>
+        <a [href]="repo + '/releases/latest'" target="_blank" rel="noopener">
+          <ion-icon name="logo-android" aria-hidden="true"></ion-icon> Download the Android app
+        </a>
+      </p>
+      <p class="muted">
+        The Android app (APK) is attached to each release on GitHub. Allow installs from your browser when Android asks.
       </p>
       <p class="muted">
         Generations is MIT licensed and runs on Firebase's free plan. Anyone can host their own copy for their family.
