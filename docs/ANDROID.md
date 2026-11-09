@@ -22,9 +22,8 @@ launch screen and `MainActivity`.
   bar (`--ion-safe-area-*` in `src/global.scss`); status-bar icons follow the
   app theme (`src/app/core/theme.ts`).
 - The Android back button navigates back (`@capacitor/app`).
-- **Sign-in:** email and password. "Continue with Google" is hidden in the app
-  for now: Google's sign-in popup cannot open inside the WebView; a native
-  sign-in plugin brings it back later.
+- **Sign-in:** email and password, or **Continue with Google** through
+  Android's own account picker (see below).
 - No service worker: the APK already contains the app's files.
 
 ## Firebase configuration
@@ -44,6 +43,8 @@ the app connects to needs these one-time console changes:
 2. **App Check:** Google Cloud console → Security → reCAPTCHA → the project's
    key → domains: add `localhost`.
 
+Both are in place for `generations-uat` and `generations-prod`.
+
 Without them, sign-in fails (blocked referer) and Firestore rejects every
 request (App Check). Both lower the protection of the public key a little:
 any page served from `localhost` (for example on a developer's computer) can
@@ -52,6 +53,31 @@ Rules still decide what each signed-in user can read and write, so this does
 not expose anyone's data; it only weakens the bot protection of the free
 quota. A native App Check provider (Play Integrity) would avoid it but needs
 a native Firebase plugin; revisit if abuse shows up.
+
+## Google sign-in
+
+Browsers use Firebase's Google popup, which cannot open inside the app's
+WebView. The app uses `@capgo/capacitor-social-login` instead: Android's
+Credential Manager shows the system account picker and returns a Google ID
+token, which the app exchanges with `signInWithCredential`. No browser,
+redirect or Dynamic Links. Only the plugin's Google provider is bundled
+(`capacitor.config.ts`); the others, including Facebook's SDK and its
+advertising-ID permission, are left out.
+
+Setup per Firebase project (done for UAT and Production):
+
+1. The Android app is registered in Firebase (Project settings → Your apps)
+   with the package name (`io.github.deepakdaneva.generations` in Production,
+   `.uat` in UAT) and the signing key's SHA-1 and SHA-256 (see "Signing key").
+   Registering creates the Android OAuth client Google checks.
+2. The project's **web** client ID (Authentication → Sign-in method → Google →
+   Web SDK configuration) is in `src/environments/google-sign-in.ts`. Without
+   one, the app hides the Google button for that project.
+
+A new signing key must be added to both Firebase apps. The PR debug APKs are
+signed with a throwaway debug key, so Google sign-in fails in them
+(`Developer console is not set up correctly`); test it with the signed UAT
+APK.
 
 ## Building locally
 
@@ -121,4 +147,7 @@ uninstall and reinstall to get new versions.
 
 The signing certificate's SHA-1 and SHA-256 fingerprints are printed by the
 **Sign and verify** step of every release run (`apksigner verify
---print-certs`); native Google sign-in will need them.
+--print-certs`):
+
+- SHA-1 `5a:67:aa:61:0d:eb:18:6e:5a:81:01:a3:a2:8e:2f:8b:05:5d:3c:ed`
+- SHA-256 `6a:87:f2:73:a3:32:c1:85:29:ac:69:39:1e:be:69:e1:57:58:5c:91:9a:96:55:ea:4a:f6:10:e4:e5:46:08:93`

@@ -211,8 +211,8 @@ created by Firebase)" → **Application restrictions: Websites**:
 
 | Project | Allowed websites |
 |---|---|
-| `generations-uat` | `https://generations-uat.web.app/*`, `https://generations-uat.firebaseapp.com/*` |
-| `generations-prod` | `https://generations-prod.web.app/*`, `https://generations-prod.firebaseapp.com/*` |
+| `generations-uat` | `https://generations-uat.web.app/*`, `https://generations-uat.firebaseapp.com/*`, `https://localhost/*` (Android app) |
+| `generations-prod` | `https://generations-prod.web.app/*`, `https://generations-prod.firebaseapp.com/*`, `https://localhost/*` (Android app) |
 
 - Keep the `firebaseapp.com` entry: Google sign-in runs on that domain.
 - Add `https://localhost/*` only for the Android app (see
