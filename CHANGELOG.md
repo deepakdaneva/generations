@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/deepakdaneva/generations/compare/v1.3.1...v1.3.2) (2026-11-09)
+
+
+### Bug Fixes
+
+* **deps:** lift minimatch and glob to patched versions in dev tools ([#36](https://github.com/deepakdaneva/generations/issues/36)) ([ab1d1e7](https://github.com/deepakdaneva/generations/commit/ab1d1e7c5c6c941645bfcf0d8139d85d69468851))
+
 ## [1.3.1](https://github.com/deepakdaneva/generations/compare/v1.3.0...v1.3.1) (2026-11-09)
 
 
